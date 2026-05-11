@@ -382,6 +382,8 @@ input:checked+.slider::before{transform:translateX(20px)}
 function doGet(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var result = {};
+
+  // Hojas de datos normales
   ['Pedidos','Clientes','Finanzas'].forEach(function(name) {
     var sheet = ss.getSheetByName(name);
     if (!sheet) { result[name] = []; return; }
@@ -394,6 +396,16 @@ function doGet(e) {
       return obj;
     });
   });
+
+  // Hoja Eliminados — lista de IDs borrados (compartida entre dispositivos)
+  var delSheet = ss.getSheetByName('Eliminados');
+  if (delSheet && delSheet.getLastRow() > 1) {
+    var delVals = delSheet.getDataRange().getValues();
+    result['Eliminados'] = delVals.slice(1).map(function(r){ return String(r[0]); });
+  } else {
+    result['Eliminados'] = [];
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
@@ -403,6 +415,34 @@ function doGet(e) {
 function doPost(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var data = JSON.parse(e.postData.contents);
+
+  // Acción especial: registrar un ID como eliminado en la hoja Eliminados
+  if (data.action === 'markDeleted') {
+    var delSheet = ss.getSheetByName('Eliminados') || ss.insertSheet('Eliminados');
+    if (delSheet.getLastRow() === 0) delSheet.appendRow(['ID_Eliminado','Fecha','Hoja']);
+    // Evitar duplicados
+    var existing = delSheet.getLastRow() > 1
+      ? delSheet.getDataRange().getValues().slice(1).map(function(r){ return String(r[0]); })
+      : [];
+    if (existing.indexOf(String(data.id)) === -1) {
+      delSheet.appendRow([String(data.id), new Date().toLocaleDateString('es-MX'), data.sheet||'']);
+    }
+    // Borrar también el registro de la hoja de origen
+    if (data.sheet && data.sheet !== 'Eliminados') {
+      var src = ss.getSheetByName(data.sheet);
+      if (src && src.getLastRow() > 1) {
+        var vals = src.getDataRange().getValues();
+        for (var i = 1; i < vals.length; i++) {
+          if (String(vals[i][0]) === String(data.id)) { src.deleteRow(i+1); break; }
+        }
+      }
+    }
+    return ContentService
+      .createTextOutput(JSON.stringify({ok:true}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Acciones normales: append / update / delete
   var sheet = ss.getSheetByName(data.sheet) || ss.insertSheet(data.sheet);
 
   if (sheet.getLastRow() === 0) {
@@ -430,6 +470,7 @@ function doPost(e) {
       if (String(vals[i][0]) === String(data.id)) { sheet.deleteRow(i+1); break; }
     }
   }
+
   return ContentService
     .createTextOutput(JSON.stringify({ok:true}))
     .setMimeType(ContentService.MimeType.JSON);
@@ -489,19 +530,29 @@ async function syncSheets(payload){
   catch(e){ console.warn('Sheets sync error:',e); }
 }
 
+// Registra un ID como eliminado en Sheets (hoja Eliminados) y en la lista local
+async function syncDelete(id, sheet){
+  markDeleted(id);
+  save();
+  // Envía a Sheets: elimina el registro Y lo anota en hoja Eliminados
+  await syncSheets({action:'markDeleted', id, sheet});
+}
+
 async function syncFromSheets(){
   if(!sheetsUrl){ toast('Configura primero la URL de Google Sheets','err'); return; }
   const btn=$('sync-btn');
   btn.textContent='⏳'; btn.disabled=true;
   try{
-    // Google Apps Script redirects to a different domain, so we must follow
-    // redirects manually using mode:'cors' — the Apps Script must set CORS headers
-    const res=await fetch(sheetsUrl+'?t='+Date.now(),{
-      method:'GET',
-      redirect:'follow'
-    });
+    const res=await fetch(sheetsUrl+'?t='+Date.now(),{method:'GET',redirect:'follow'});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data=await res.json();
+
+    // ── LISTA NEGRA — leer IDs eliminados desde Sheets y fusionar con los locales ──
+    if(Array.isArray(data.Eliminados)){
+      data.Eliminados.forEach(id=>deletedIds.add(String(id)));
+      // Guardar la lista negra actualizada localmente
+      localStorage.setItem('dtf_del',JSON.stringify([...deletedIds]));
+    }
 
     // ── CLIENTES ──
     if(Array.isArray(data.Clientes)){
@@ -511,9 +562,8 @@ async function syncFromSheets(){
           id:String(r.ID), name:String(r.Nombre), phone:String(r.Teléfono||r.Telefono||''),
           email:String(r.Correo||''), notes:String(r.Notas||''), since:String(r.Alta||'')
         }));
-      // Mantén los locales que no existen en remoto (recién creados, aún no sincronizados)
-      const remoteIds=new Set(remote.map(c=>c.id));
-      const localOnly=clients.filter(c=>!remoteIds.has(c.id)&&!deletedIds.has(c.id));
+      const remoteIds=new Set(remote.map(x=>x.id));
+      const localOnly=clients.filter(x=>!remoteIds.has(x.id)&&!deletedIds.has(x.id));
       clients=[...remote,...localOnly];
     }
 
@@ -523,7 +573,7 @@ async function syncFromSheets(){
         .filter(r=>r.ID&&r.Cliente&&!deletedIds.has(String(r.ID)))
         .map(r=>{
           const estado=String(r.Estado||'pendiente').toLowerCase();
-          return {
+          return{
             id:String(r.ID), date:String(r.Fecha||''), ts:0,
             clientId:'', clientName:String(r.Cliente||''), clientPhone:String(r.Teléfono||r.Telefono||''),
             dtfOn:parseFloat(r.DTF_m||0)>0, stOn:parseFloat(r.Prendas||0)>0, vnOn:parseFloat(r.Vinil_ml||0)>0,
@@ -538,17 +588,10 @@ async function syncFromSheets(){
           };
         });
       const remoteIds=new Set(remote.map(o=>o.id));
-      // Actualiza estado de pedidos locales existentes
-      orders.forEach(o=>{
-        const r=remote.find(x=>x.id===o.id);
-        if(r){ o.paid=r.paid; o.prod=r.prod; o.done=r.done; }
-      });
-      // Agrega pedidos remotos que no existen localmente
-      const localIds=new Set(orders.map(o=>o.id));
-      const remoteOnly=remote.filter(o=>!localIds.has(o.id));
-      // Elimina pedidos locales que ya no están en remoto (borrados desde otro dispositivo)
-      orders=orders.filter(o=>remoteIds.has(o.id)||!o._synced);
-      orders=[...orders.filter(o=>!remoteIds.has(o.id)),...remote];
+      // Actualiza estado de pedidos locales que existen en remoto
+      orders.forEach(o=>{ const r=remote.find(x=>x.id===o.id); if(r){o.paid=r.paid;o.prod=r.prod;o.done=r.done;} });
+      // Sheets manda: usar lista remota completa (respetando lista negra)
+      orders=remote;
     }
 
     // ── FINANZAS ──
@@ -559,20 +602,19 @@ async function syncFromSheets(){
           id:String(r.ID), date:String(r.Fecha||''),
           desc:String(r.Descripción||r.Descripcion||''),
           amount:parseCurrency(String(r.Monto||'0')),
-          type:String(r.Tipo||'gasto').toLowerCase()==='ingreso'?'ingreso':'gasto'
+          type:String(r.Tipo||'gasto').toLowerCase()==='ingreso'?'ingreso':'gasto',
+          _inSheets:true
         }));
-      // Sheets es la fuente de verdad para finanzas — reemplaza completamente,
-      // pero respeta la lista negra de eliminados
-      const localUnsaved=transactions.filter(t=>!t._inSheets&&!deletedIds.has(t.id));
+      // Agrega transacciones locales aún no enviadas a Sheets
       const remoteIds=new Set(remote.map(t=>t.id));
-      const localOnly=localUnsaved.filter(t=>!remoteIds.has(t.id));
-      transactions=[...remote,...localOnly];
+      const localPending=transactions.filter(t=>!t._inSheets&&!deletedIds.has(t.id)&&!remoteIds.has(t.id));
+      transactions=[...remote,...localPending];
     }
 
     save();
     renderClients(''); renderPicker('');
     renderOrders(); renderFin();
-    toast('✅ Datos sincronizados desde Sheets');
+    toast('✅ Sincronizado correctamente');
   } catch(e){
     console.error('syncFromSheets:',e);
     toast('Error al leer Sheets — revisa la URL o el script','err');
@@ -820,9 +862,8 @@ function toggleStatus(id,field){
 function deleteOrder(id){
   orders=orders.filter(o=>o.id!==id);
   transactions=transactions.filter(t=>t.oid!==id);
-  markDeleted(id); markDeleted('tx_'+id); save();
-  syncSheets({sheet:'Pedidos',action:'delete',id});
-  syncSheets({sheet:'Finanzas',action:'delete',id:'tx_'+id});
+  syncDelete(id,'Pedidos');
+  syncDelete('tx_'+id,'Finanzas');
   renderOrders(); toast('Pedido eliminado');
 }
 
@@ -830,9 +871,8 @@ function deleteGroup(date){
   const ids=orders.filter(o=>o.date===date).map(o=>o.id);
   orders=orders.filter(o=>o.date!==date);
   transactions=transactions.filter(t=>!ids.includes(t.oid));
-  ids.forEach(id=>{ markDeleted(id); markDeleted('tx_'+id); });
   save();
-  ids.forEach(id=>{ syncSheets({sheet:'Pedidos',action:'delete',id}); syncSheets({sheet:'Finanzas',action:'delete',id:'tx_'+id}); });
+  ids.forEach(id=>{ syncDelete(id,'Pedidos'); syncDelete('tx_'+id,'Finanzas'); });
   renderOrders(); toast(`${ids.length} pedido${ids.length>1?'s':''} eliminado${ids.length>1?'s':''}`);
 }
 
@@ -892,8 +932,7 @@ function editClient(id){
 }
 function deleteClient(id){
   clients=clients.filter(c=>c.id!==id);
-  markDeleted(id); save();
-  syncSheets({sheet:'Clientes',action:'delete',id});
+  syncDelete(id,'Clientes');
   renderClients(''); renderPicker(''); toast('Cliente eliminado');
 }
 function cancelEdit(){ clearCForm(); }
@@ -932,7 +971,7 @@ function resetFinanzas(){
     const before=transactions.length;
     transactions.forEach(t=>{
       const p=t.date.split('/');
-      if(p.length===3&&p[1].padStart(2,'0')===mon&&p[2]===yr) markDeleted(t.id);
+      if(p.length===3&&p[1].padStart(2,'0')===mon&&p[2]===yr) syncDelete(t.id,'Finanzas');
     });
     transactions=transactions.filter(t=>{
       const p=t.date.split('/');
@@ -950,7 +989,7 @@ function resetFinanzas(){
     toast(`Finanzas de ${mon}/${yr} reiniciadas ✓`);
   } else {
     if(!confirm('⚠️ ¿Reiniciar TODOS los movimientos de finanzas?\n\nEsto eliminará todos los registros. Los pedidos seguirán existiendo pero se desmarcarán como pagados.\n\nEsta acción no se puede deshacer.')) return;
-    transactions.forEach(t=>markDeleted(t.id));
+    transactions.forEach(t=>syncDelete(t.id,'Finanzas'));
     transactions=[];
     orders.forEach(o=>o.paid=false);
     save(); renderFin(); renderOrders();
@@ -988,8 +1027,7 @@ function saveFinRows(){
 }
 function deleteTx(id){
   transactions=transactions.filter(t=>t.id!==id);
-  markDeleted(id); save();
-  syncSheets({sheet:'Finanzas',action:'delete',id});
+  syncDelete(id,'Finanzas');  // marca en Sheets + lista negra local
   renderFin(); toast('Movimiento eliminado');
 }
 function renderFin(){
