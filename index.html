@@ -166,6 +166,7 @@ input:checked+.slider::before{transform:translateX(20px)}
       <div class="sheets-badge" id="sbadge">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>Sheets
       </div>
+      <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" id="sync-btn" onclick="syncFromSheets()" title="Sincronizar desde Sheets" style="display:none">🔄</button>
       <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="openSheets()">⚙️ Config</button>
     </div>
   </div>
@@ -364,7 +365,7 @@ input:checked+.slider::before{transform:translateX(20px)}
     <div class="modal-title">⚙️ Conectar Google Sheets</div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6">Pega la URL de tu Google Apps Script Web App. Todos los datos se sincronizarán automáticamente.</p>
     <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:10px 14px;font-size:12px;color:rgba(52,211,153,.8);margin-bottom:14px">
-      📱 <strong>Sincronización entre dispositivos:</strong> esta app guarda los datos localmente en cada dispositivo. Para verlos en todos tus dispositivos, conecta Google Sheets. Cada acción (crear pedido, cliente, movimiento) se enviará a tu hoja de cálculo automáticamente.
+      🔄 <strong>Sincronización bidireccional:</strong> la app ahora lee Y escribe en tu hoja. Al abrir la app (o pulsar 🔄) descarga los datos actualizados, así todos tus dispositivos ven siempre lo mismo.
     </div>
     <div style="margin-bottom:14px"><label>URL del Web App</label><input class="inp" id="sheets-url" placeholder="https://script.google.com/macros/s/..."/></div>
     <div style="background:rgba(66,133,244,.08);border:1px solid rgba(66,133,244,.2);border-radius:10px;padding:12px;font-size:12px;color:rgba(150,180,255,.7);line-height:1.8;margin-bottom:10px">
@@ -412,8 +413,23 @@ input:checked+.slider::before{transform:translateX(20px)}
 }
 
 function doGet(e) {
-  return ContentService.createTextOutput('DTF Studio OK')
-    .setMimeType(ContentService.MimeType.TEXT);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var result = {};
+  var sheetNames = ['Pedidos', 'Clientes', 'Finanzas'];
+  sheetNames.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) { result[name] = []; return; }
+    var vals = sheet.getDataRange().getValues();
+    if (vals.length <= 1) { result[name] = []; return; }
+    var headers = vals[0];
+    result[name] = vals.slice(1).map(function(row) {
+      var obj = {};
+      headers.forEach(function(h, i) { obj[h] = row[i]; });
+      return obj;
+    });
+  });
+  return ContentService.createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
 }</pre>
       <div style="font-size:11px;color:var(--muted2);margin-top:6px;cursor:pointer" onclick="copyScript()">📋 Clic en el código para copiar</div>
     </div>
@@ -463,11 +479,103 @@ function save(){
 async function syncSheets(payload){
   if(!sheetsUrl)return;
   try{ await fetch(sheetsUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); }
-  catch(e){ console.warn('Sheets:',e); }
+  catch(e){ console.warn('Sheets sync error:',e); }
 }
+
+async function syncFromSheets(){
+  if(!sheetsUrl){ toast('Configura primero la URL de Google Sheets','err'); return; }
+  const btn=$('sync-btn');
+  btn.textContent='⏳'; btn.disabled=true;
+  try{
+    const res=await fetch(sheetsUrl+'?t='+Date.now(),{method:'GET'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data=await res.json();
+
+    // ── CLIENTES ──
+    if(Array.isArray(data.Clientes)&&data.Clientes.length>0){
+      const remote=data.Clientes.filter(r=>r.ID&&r.Nombre).map(r=>({
+        id:String(r.ID), name:String(r.Nombre), phone:String(r.Teléfono||r.Telefono||''),
+        email:String(r.Correo||''), notes:String(r.Notas||''), since:String(r.Alta||'')
+      }));
+      // Merge: keep local-only entries, overwrite with remote data
+      const remoteIds=new Set(remote.map(c=>c.id));
+      const localOnly=clients.filter(c=>!remoteIds.has(c.id));
+      clients=[...remote,...localOnly];
+    }
+
+    // ── PEDIDOS ──
+    if(Array.isArray(data.Pedidos)&&data.Pedidos.length>0){
+      const remote=data.Pedidos.filter(r=>r.ID&&r.Cliente).map(r=>{
+        const estado=String(r.Estado||'pendiente').toLowerCase();
+        return {
+          id:String(r.ID), date:String(r.Fecha||''), ts:0,
+          clientId:'', clientName:String(r.Cliente||''), clientPhone:String(r.Teléfono||r.Telefono||''),
+          dtfOn:parseFloat(r.DTF_m||0)>0, stOn:parseFloat(r.Prendas||0)>0, vnOn:parseFloat(r.Vinil_ml||0)>0,
+          metros:parseFloat(r.DTF_m||0), shirts:parseFloat(r.Prendas||0), vH:parseFloat(r.Vinil_ml||0),
+          dtfT:parseFloat(r.DTF_m||0)*DTF, stT:0, vnT:0,
+          preDisc:0, dp:0, dA:0, sub:0, iva:0,
+          total:parseCurrency(String(r.Total||'0')),
+          notes:String(r.Notas||''),
+          paid:estado==='pagado'||estado==='paid',
+          prod:estado==='produccion'||estado==='prod',
+          done:estado==='entregado'||estado==='done'
+        };
+      });
+      const remoteIds=new Set(remote.map(o=>o.id));
+      // Prefer local orders (richer data), fill in any missing from remote
+      const localIds=new Set(orders.map(o=>o.id));
+      const remoteOnly=remote.filter(o=>!localIds.has(o.id));
+      // Update status on existing local orders from remote
+      orders.forEach(o=>{
+        const r=remote.find(x=>x.id===o.id);
+        if(r){ o.paid=r.paid; o.prod=r.prod; o.done=r.done; }
+      });
+      orders=[...orders,...remoteOnly];
+    }
+
+    // ── FINANZAS ──
+    if(Array.isArray(data.Finanzas)&&data.Finanzas.length>0){
+      const remote=data.Finanzas.filter(r=>r.ID&&r.Descripción).map(r=>({
+        id:String(r.ID), date:String(r.Fecha||''),
+        desc:String(r.Descripción||r.Descripcion||''),
+        amount:parseCurrency(String(r.Monto||'0')),
+        type:String(r.Tipo||'gasto').toLowerCase()==='ingreso'?'ingreso':'gasto'
+      }));
+      const remoteIds=new Set(remote.map(t=>t.id));
+      const localOnly=transactions.filter(t=>!remoteIds.has(t.id));
+      transactions=[...remote,...localOnly];
+    }
+
+    save();
+    renderClients(''); renderPicker('');
+    renderOrders(); renderFin();
+    toast('✅ Datos sincronizados desde Sheets');
+  } catch(e){
+    console.error('syncFromSheets:',e);
+    toast('Error al leer Sheets — revisa la URL o el script','err');
+  } finally {
+    btn.textContent='🔄'; btn.disabled=false;
+  }
+}
+
+function parseCurrency(s){
+  // Handles "$1,234.56" or "1234.56"
+  return parseFloat(s.replace(/[^0-9.\-]/g,''))||0;
+}
+
 function openSheets(){ document.getElementById('sheets-url').value=sheetsUrl; document.getElementById('sheets-modal').classList.add('on'); }
-function saveSheets(){ sheetsUrl=document.getElementById('sheets-url').value.trim(); localStorage.setItem('dtf_su',sheetsUrl); updateBadge(); closeModal('sheets-modal'); toast(sheetsUrl?'Google Sheets conectado ✓':'URL eliminada'); }
-function updateBadge(){ document.getElementById('sbadge').className='sheets-badge'+(sheetsUrl?' on':''); }
+function saveSheets(){
+  sheetsUrl=document.getElementById('sheets-url').value.trim();
+  localStorage.setItem('dtf_su',sheetsUrl);
+  updateBadge(); closeModal('sheets-modal');
+  if(sheetsUrl){ toast('Google Sheets conectado ✓'); syncFromSheets(); }
+  else toast('URL eliminada');
+}
+function updateBadge(){
+  document.getElementById('sbadge').className='sheets-badge'+(sheetsUrl?' on':'');
+  const sb=$('sync-btn');
+  if(sb) sb.style.display=sheetsUrl?'inline-flex':'none';
+}
 function copyScript(){
   const t=document.getElementById('script-code').textContent;
   navigator.clipboard.writeText(t).then(()=>toast('Código copiado ✓')).catch(()=>toast('Selecciona y copia manualmente','err'));
@@ -923,6 +1031,12 @@ function renderFin(){
 
 // ═══════════════ INIT ═══════════════
 initFR(); calcQ(); validatePhone(); updateBadge(); renderClients('');
+// Auto-sync from Sheets on load (silently, without blocking UI)
+if(sheetsUrl){
+  setTimeout(()=>{
+    syncFromSheets().catch(e=>console.warn('Auto-sync on load failed:',e));
+  }, 800);
+}
 </script>
 </body>
 </html>
