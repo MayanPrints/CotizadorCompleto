@@ -151,6 +151,20 @@ input:checked+.slider::before{transform:translateX(20px)}
 .modal-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;margin-bottom:18px}
 .modal-actions{display:flex;gap:10px;margin-top:18px}
 .empty{text-align:center;padding:30px 0;color:var(--muted2);font-size:13px}
+/* CONFIRM MODAL */
+.confirm-modal{background:#1a1040;border:1px solid rgba(248,113,113,.35);border-radius:18px;padding:28px 24px;width:100%;max-width:400px}
+.confirm-icon{font-size:36px;text-align:center;margin-bottom:10px}
+.confirm-msg{font-size:14px;color:var(--muted);text-align:center;line-height:1.6;margin-bottom:20px}
+.confirm-name{font-weight:700;color:var(--text)}
+/* TRASH */
+.trash-item{background:rgba(255,255,255,.04);border:1px solid rgba(150,120,255,.12);border-radius:12px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.trash-type{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px}
+.trash-type.fin{background:rgba(52,211,153,.12);color:var(--green)}
+.trash-type.ped{background:rgba(160,132,238,.12);color:#c4b5fd}
+.trash-type.cli{background:rgba(251,191,36,.12);color:var(--yellow)}
+.btn-restore{background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.3);border-radius:8px;padding:5px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .2s;display:inline-flex;align-items:center;gap:4px}
+.btn-restore:hover{background:rgba(52,211,153,.22)}
+.trash-badge{background:rgba(248,113,113,.18);color:var(--red);border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;vertical-align:middle}
 @media(max-width:560px){
   .g2,.g3,.g4{grid-template-columns:1fr}.g-stats{grid-template-columns:1fr}
   .fin-head,.fin-row{grid-template-columns:1fr 80px 28px}.fh{display:none}
@@ -166,8 +180,8 @@ input:checked+.slider::before{transform:translateX(20px)}
       <div class="sheets-badge" id="sbadge">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>Sheets
       </div>
-      <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" id="sync-btn" onclick="syncFromSheets()" title="Sincronizar desde Sheets" style="display:none">🔄</button>
-      <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="openSheets()">⚙️ Config</button>
+      <button class="btn btn-ghost" id="sync-btn" onclick="syncFromSheets()" title="Sincronizar desde Sheets" style="font-size:14px;padding:6px 10px;display:none">🔄</button>
+      <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="openSheets()">⚙️</button>
     </div>
   </div>
   <div class="tabs">
@@ -175,6 +189,7 @@ input:checked+.slider::before{transform:translateX(20px)}
     <button class="tab" data-tab="pedidos" onclick="switchTab('pedidos')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Pedidos</button>
     <button class="tab" data-tab="clientes" onclick="switchTab('clientes')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Clientes</button>
     <button class="tab" data-tab="finanzas" onclick="switchTab('finanzas')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Finanzas</button>
+    <button class="tab" data-tab="papelera" onclick="switchTab('papelera')" id="tab-btn-papelera"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>Papelera<span class="trash-badge" id="trash-badge" style="display:none">0</span></button>
   </div>
 </div></div>
 
@@ -355,9 +370,32 @@ input:checked+.slider::before{transform:translateX(20px)}
     <div id="tx-list"></div>
   </div>
 </div>
+<!-- ═══ PAPELERA ═══ -->
+<div id="tab-papelera" class="panel">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
+    <div style="font-size:13px;color:var(--muted)">Elementos eliminados — puedes restaurarlos en cualquier momento.</div>
+    <button class="btn-del" style="background:rgba(255,80,80,.1);border-color:rgba(255,80,80,.3)" onclick="emptyTrash()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+      Vaciar papelera
+    </button>
+  </div>
+  <div id="trash-list"><div class="empty">La papelera está vacía 🗑️</div></div>
+</div>
 </div><!-- /content -->
 
 <div class="toast" id="toast"></div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-bg" id="confirm-modal">
+  <div class="confirm-modal">
+    <div class="confirm-icon" id="confirm-icon">🗑️</div>
+    <div class="confirm-msg" id="confirm-msg">¿Eliminar este elemento?</div>
+    <div class="modal-actions">
+      <button class="btn btn-del" style="flex:1;justify-content:center;padding:11px;font-size:14px" id="confirm-ok-btn" onclick="confirmOk()">Sí, eliminar</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="closeModal('confirm-modal')">Cancelar</button>
+    </div>
+  </div>
+</div>
 
 <!-- SHEETS MODAL -->
 <div class="modal-bg" id="sheets-modal">
@@ -509,10 +547,14 @@ let transactions= JSON.parse(localStorage.getItem('dtf_t')||'[]');
 let sheetsUrl   = localStorage.getItem('dtf_su')||'';
 // Lista negra: IDs eliminados localmente — no vuelven desde Sheets
 let deletedIds  = new Set(JSON.parse(localStorage.getItem('dtf_del')||'[]'));
+// Papelera: registros borrados que pueden restaurarse
+let trash       = JSON.parse(localStorage.getItem('dtf_trash')||'[]');
 let selClient   = '';
 let finRows     = [];
 let finChart    = null;
 let pickerOpen  = false;
+// Confirmación pendiente
+let _confirmCb  = null;
 
 // ═══════════════ PERSIST ═══════════════
 function save(){
@@ -520,6 +562,7 @@ function save(){
   localStorage.setItem('dtf_o',JSON.stringify(orders));
   localStorage.setItem('dtf_t',JSON.stringify(transactions));
   localStorage.setItem('dtf_del',JSON.stringify([...deletedIds]));
+  localStorage.setItem('dtf_trash',JSON.stringify(trash));
 }
 function markDeleted(id){ deletedIds.add(id); }
 
@@ -530,11 +573,92 @@ async function syncSheets(payload){
   catch(e){ console.warn('Sheets sync error:',e); }
 }
 
-// Registra un ID como eliminado en Sheets (hoja Eliminados) y en la lista local
+// ── CONFIRMACIÓN ────────────────────────────────
+function confirmAction(icon, msg, cb){
+  $('confirm-icon').textContent = icon;
+  $('confirm-msg').innerHTML = msg;
+  _confirmCb = cb;
+  $('confirm-modal').classList.add('on');
+}
+function confirmOk(){
+  closeModal('confirm-modal');
+  if(_confirmCb){ _confirmCb(); _confirmCb=null; }
+}
+
+// ── PAPELERA ─────────────────────────────────────
+function addToTrash(item){
+  // Evitar duplicados en papelera
+  if(!trash.find(t=>t._trashId===item._trashId)) trash.unshift(item);
+  updateTrashBadge();
+}
+function updateTrashBadge(){
+  const badge=$('trash-badge');
+  if(!badge)return;
+  if(trash.length>0){badge.style.display='inline-flex';badge.textContent=trash.length;}
+  else badge.style.display='none';
+}
+function renderTrash(){
+  const list=$('trash-list');
+  if(!trash.length){list.innerHTML='<div class="empty">La papelera está vacía 🗑️</div>';return;}
+  list.innerHTML=trash.map(item=>{
+    const typeLabel={fin:'Finanza',ped:'Pedido',cli:'Cliente'}[item._trashType]||'Item';
+    const typeClass={fin:'fin',ped:'ped',cli:'cli'}[item._trashType]||'fin';
+    const name = item._trashLabel||item.desc||item.clientName||item.name||'-';
+    const date = item._trashDate||'';
+    return `<div class="trash-item">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <span class="trash-type ${typeClass}">${typeLabel}</span>
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+          <div style="font-size:11px;color:var(--muted2);margin-top:1px">Eliminado: ${date}</div>
+        </div>
+      </div>
+      <button class="btn-restore" onclick="restoreItem('${item._trashId}')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 109-9 9 9 0 00-9 9"/><path d="M3 3v6h6"/></svg>
+        Restaurar
+      </button>
+    </div>`;
+  }).join('');
+}
+function restoreItem(trashId){
+  const item=trash.find(t=>t._trashId===trashId);
+  if(!item)return;
+  // Quitar de lista negra
+  deletedIds.delete(item._trashId);
+  if(item._trashType==='fin'){
+    const{_trashId,_trashType,_trashLabel,_trashDate,...tx}=item;
+    transactions.unshift(tx);
+    syncSheets({sheet:'Finanzas',action:'append',row:[tx.id,tx.date,tx.desc,fmt(tx.amount),tx.type==='ingreso'?'Ingreso':'Gasto']});
+  } else if(item._trashType==='ped'){
+    const{_trashId,_trashType,_trashLabel,_trashDate,...order}=item;
+    orders.unshift(order);
+    syncSheets({sheet:'Pedidos',action:'append',row:[order.id,order.date,order.clientName,order.clientPhone,order.dtfOn?order.metros:0,order.stOn?order.shirts:0,order.vnOn?order.vH:0,fmt(order.total),order.notes,'pendiente']});
+  } else if(item._trashType==='cli'){
+    const{_trashId,_trashType,_trashLabel,_trashDate,...client}=item;
+    clients.unshift(client);
+    syncSheets({sheet:'Clientes',action:'append',row:[client.id,client.name,client.phone,client.email,client.notes,client.since]});
+  }
+  // También eliminar de hoja Eliminados en Sheets
+  syncSheets({action:'restoreDeleted', id:trashId});
+  trash=trash.filter(t=>t._trashId!==trashId);
+  save();
+  updateTrashBadge(); renderTrash();
+  renderOrders(); renderClients(''); renderFin();
+  toast('↩️ Elemento restaurado ✓');
+}
+function emptyTrash(){
+  if(!trash.length){toast('La papelera ya está vacía');return;}
+  confirmAction('🗑️',`¿Vaciar la papelera? Se eliminarán <span class="confirm-name">${trash.length} elemento${trash.length>1?'s':''}</span> permanentemente.`,()=>{
+    trash=[];
+    save(); updateTrashBadge(); renderTrash();
+    toast('Papelera vaciada');
+  });
+}
+
+// ── ELIMINAR con papelera ─────────────────────────
 async function syncDelete(id, sheet){
   markDeleted(id);
   save();
-  // Envía a Sheets: elimina el registro Y lo anota en hoja Eliminados
   await syncSheets({action:'markDeleted', id, sheet});
 }
 
@@ -860,20 +984,35 @@ function toggleStatus(id,field){
 }
 
 function deleteOrder(id){
-  orders=orders.filter(o=>o.id!==id);
-  transactions=transactions.filter(t=>t.oid!==id);
-  syncDelete(id,'Pedidos');
-  syncDelete('tx_'+id,'Finanzas');
-  renderOrders(); toast('Pedido eliminado');
+  const o=orders.find(x=>x.id===id); if(!o)return;
+  confirmAction('📋',`¿Eliminar el pedido de <span class="confirm-name">${o.clientName}</span>? Irá a la papelera.`,()=>{
+    addToTrash({...o, _trashId:id, _trashType:'ped', _trashLabel:o.clientName, _trashDate:new Date().toLocaleDateString('es-MX')});
+    const linkedTx=transactions.find(t=>t.oid===id);
+    if(linkedTx) addToTrash({...linkedTx, _trashId:'tx_'+id, _trashType:'fin', _trashLabel:linkedTx.desc, _trashDate:new Date().toLocaleDateString('es-MX')});
+    orders=orders.filter(x=>x.id!==id);
+    transactions=transactions.filter(t=>t.oid!==id);
+    syncDelete(id,'Pedidos');
+    syncDelete('tx_'+id,'Finanzas');
+    renderOrders(); toast('Pedido eliminado — puedes restaurarlo en Papelera');
+  });
 }
 
 function deleteGroup(date){
-  const ids=orders.filter(o=>o.date===date).map(o=>o.id);
-  orders=orders.filter(o=>o.date!==date);
-  transactions=transactions.filter(t=>!ids.includes(t.oid));
-  save();
-  ids.forEach(id=>{ syncDelete(id,'Pedidos'); syncDelete('tx_'+id,'Finanzas'); });
-  renderOrders(); toast(`${ids.length} pedido${ids.length>1?'s':''} eliminado${ids.length>1?'s':''}`);
+  const grpOrders=orders.filter(o=>o.date===date);
+  if(!grpOrders.length)return;
+  confirmAction('📅',`¿Eliminar los <span class="confirm-name">${grpOrders.length} pedido${grpOrders.length>1?'s':''}</span> del ${date}? Irán a la papelera.`,()=>{
+    grpOrders.forEach(o=>{
+      addToTrash({...o, _trashId:o.id, _trashType:'ped', _trashLabel:o.clientName, _trashDate:new Date().toLocaleDateString('es-MX')});
+      const linkedTx=transactions.find(t=>t.oid===o.id);
+      if(linkedTx) addToTrash({...linkedTx, _trashId:'tx_'+o.id, _trashType:'fin', _trashLabel:linkedTx.desc, _trashDate:new Date().toLocaleDateString('es-MX')});
+    });
+    const ids=grpOrders.map(o=>o.id);
+    orders=orders.filter(o=>o.date!==date);
+    transactions=transactions.filter(t=>!ids.includes(t.oid));
+    save();
+    ids.forEach(id=>{ syncDelete(id,'Pedidos'); syncDelete('tx_'+id,'Finanzas'); });
+    renderOrders(); toast(`${ids.length} pedido${ids.length>1?'s':''} eliminado${ids.length>1?'s':''} — restaurables en Papelera`);
+  });
 }
 
 function openEditOrder(id){ const o=orders.find(x=>x.id===id);if(!o)return; $('eo-id').value=id;$('eo-notes').value=o.notes||'';$('eo-disc').value=o.dp||0; $('edit-modal').classList.add('on'); }
@@ -931,9 +1070,13 @@ function editClient(id){
   validatePhone(); window.scrollTo({top:0,behavior:'smooth'});
 }
 function deleteClient(id){
-  clients=clients.filter(c=>c.id!==id);
-  syncDelete(id,'Clientes');
-  renderClients(''); renderPicker(''); toast('Cliente eliminado');
+  const cl=clients.find(x=>x.id===id); if(!cl)return;
+  confirmAction('👤',`¿Eliminar al cliente <span class="confirm-name">${cl.name}</span>? Irá a la papelera.`,()=>{
+    addToTrash({...cl, _trashId:id, _trashType:'cli', _trashLabel:cl.name, _trashDate:new Date().toLocaleDateString('es-MX')});
+    clients=clients.filter(c=>c.id!==id);
+    syncDelete(id,'Clientes');
+    renderClients(''); renderPicker(''); toast('Cliente eliminado — puedes restaurarlo en Papelera');
+  });
 }
 function cancelEdit(){ clearCForm(); }
 function clearCForm(){
@@ -1026,9 +1169,14 @@ function saveFinRows(){
   finRows=[emptyFR()]; renderFR(); renderFin();
 }
 function deleteTx(id){
-  transactions=transactions.filter(t=>t.id!==id);
-  syncDelete(id,'Finanzas');  // marca en Sheets + lista negra local
-  renderFin(); toast('Movimiento eliminado');
+  const t=transactions.find(x=>x.id===id); if(!t)return;
+  const label=t.desc||'';
+  confirmAction('🔴',`¿Eliminar el movimiento <span class="confirm-name">"${label}"</span>? Irá a la papelera.`,()=>{
+    addToTrash({...t, _trashId:id, _trashType:'fin', _trashLabel:label, _trashDate:new Date().toLocaleDateString('es-MX')});
+    transactions=transactions.filter(x=>x.id!==id);
+    syncDelete(id,'Finanzas');
+    renderFin(); toast('Movimiento eliminado — puedes restaurarlo en Papelera');
+  });
 }
 function renderFin(){
   // Month filter
