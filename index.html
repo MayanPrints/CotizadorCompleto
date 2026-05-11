@@ -466,6 +466,8 @@ let clients     = JSON.parse(localStorage.getItem('dtf_c')||'[]');
 let orders      = JSON.parse(localStorage.getItem('dtf_o')||'[]');
 let transactions= JSON.parse(localStorage.getItem('dtf_t')||'[]');
 let sheetsUrl   = localStorage.getItem('dtf_su')||'';
+// Lista negra: IDs eliminados localmente — no vuelven desde Sheets
+let deletedIds  = new Set(JSON.parse(localStorage.getItem('dtf_del')||'[]'));
 let selClient   = '';
 let finRows     = [];
 let finChart    = null;
@@ -476,7 +478,9 @@ function save(){
   localStorage.setItem('dtf_c',JSON.stringify(clients));
   localStorage.setItem('dtf_o',JSON.stringify(orders));
   localStorage.setItem('dtf_t',JSON.stringify(transactions));
+  localStorage.setItem('dtf_del',JSON.stringify([...deletedIds]));
 }
+function markDeleted(id){ deletedIds.add(id); }
 
 // ═══════════════ SHEETS ═══════════════
 async function syncSheets(payload){
@@ -500,57 +504,68 @@ async function syncFromSheets(){
     const data=await res.json();
 
     // ── CLIENTES ──
-    if(Array.isArray(data.Clientes)&&data.Clientes.length>0){
-      const remote=data.Clientes.filter(r=>r.ID&&r.Nombre).map(r=>({
-        id:String(r.ID), name:String(r.Nombre), phone:String(r.Teléfono||r.Telefono||''),
-        email:String(r.Correo||''), notes:String(r.Notas||''), since:String(r.Alta||'')
-      }));
-      // Merge: keep local-only entries, overwrite with remote data
+    if(Array.isArray(data.Clientes)){
+      const remote=data.Clientes
+        .filter(r=>r.ID&&r.Nombre&&!deletedIds.has(String(r.ID)))
+        .map(r=>({
+          id:String(r.ID), name:String(r.Nombre), phone:String(r.Teléfono||r.Telefono||''),
+          email:String(r.Correo||''), notes:String(r.Notas||''), since:String(r.Alta||'')
+        }));
+      // Mantén los locales que no existen en remoto (recién creados, aún no sincronizados)
       const remoteIds=new Set(remote.map(c=>c.id));
-      const localOnly=clients.filter(c=>!remoteIds.has(c.id));
+      const localOnly=clients.filter(c=>!remoteIds.has(c.id)&&!deletedIds.has(c.id));
       clients=[...remote,...localOnly];
     }
 
     // ── PEDIDOS ──
-    if(Array.isArray(data.Pedidos)&&data.Pedidos.length>0){
-      const remote=data.Pedidos.filter(r=>r.ID&&r.Cliente).map(r=>{
-        const estado=String(r.Estado||'pendiente').toLowerCase();
-        return {
-          id:String(r.ID), date:String(r.Fecha||''), ts:0,
-          clientId:'', clientName:String(r.Cliente||''), clientPhone:String(r.Teléfono||r.Telefono||''),
-          dtfOn:parseFloat(r.DTF_m||0)>0, stOn:parseFloat(r.Prendas||0)>0, vnOn:parseFloat(r.Vinil_ml||0)>0,
-          metros:parseFloat(r.DTF_m||0), shirts:parseFloat(r.Prendas||0), vH:parseFloat(r.Vinil_ml||0),
-          dtfT:parseFloat(r.DTF_m||0)*DTF, stT:0, vnT:0,
-          preDisc:0, dp:0, dA:0, sub:0, iva:0,
-          total:parseCurrency(String(r.Total||'0')),
-          notes:String(r.Notas||''),
-          paid:estado==='pagado'||estado==='paid',
-          prod:estado==='produccion'||estado==='prod',
-          done:estado==='entregado'||estado==='done'
-        };
-      });
+    if(Array.isArray(data.Pedidos)){
+      const remote=data.Pedidos
+        .filter(r=>r.ID&&r.Cliente&&!deletedIds.has(String(r.ID)))
+        .map(r=>{
+          const estado=String(r.Estado||'pendiente').toLowerCase();
+          return {
+            id:String(r.ID), date:String(r.Fecha||''), ts:0,
+            clientId:'', clientName:String(r.Cliente||''), clientPhone:String(r.Teléfono||r.Telefono||''),
+            dtfOn:parseFloat(r.DTF_m||0)>0, stOn:parseFloat(r.Prendas||0)>0, vnOn:parseFloat(r.Vinil_ml||0)>0,
+            metros:parseFloat(r.DTF_m||0), shirts:parseFloat(r.Prendas||0), vH:parseFloat(r.Vinil_ml||0),
+            dtfT:parseFloat(r.DTF_m||0)*DTF, stT:0, vnT:0,
+            preDisc:0, dp:0, dA:0, sub:0, iva:0,
+            total:parseCurrency(String(r.Total||'0')),
+            notes:String(r.Notas||''),
+            paid:estado==='pagado'||estado==='paid',
+            prod:estado==='produccion'||estado==='prod',
+            done:estado==='entregado'||estado==='done'
+          };
+        });
       const remoteIds=new Set(remote.map(o=>o.id));
-      // Prefer local orders (richer data), fill in any missing from remote
-      const localIds=new Set(orders.map(o=>o.id));
-      const remoteOnly=remote.filter(o=>!localIds.has(o.id));
-      // Update status on existing local orders from remote
+      // Actualiza estado de pedidos locales existentes
       orders.forEach(o=>{
         const r=remote.find(x=>x.id===o.id);
         if(r){ o.paid=r.paid; o.prod=r.prod; o.done=r.done; }
       });
-      orders=[...orders,...remoteOnly];
+      // Agrega pedidos remotos que no existen localmente
+      const localIds=new Set(orders.map(o=>o.id));
+      const remoteOnly=remote.filter(o=>!localIds.has(o.id));
+      // Elimina pedidos locales que ya no están en remoto (borrados desde otro dispositivo)
+      orders=orders.filter(o=>remoteIds.has(o.id)||!o._synced);
+      orders=[...orders.filter(o=>!remoteIds.has(o.id)),...remote];
     }
 
     // ── FINANZAS ──
-    if(Array.isArray(data.Finanzas)&&data.Finanzas.length>0){
-      const remote=data.Finanzas.filter(r=>r.ID&&r.Descripción).map(r=>({
-        id:String(r.ID), date:String(r.Fecha||''),
-        desc:String(r.Descripción||r.Descripcion||''),
-        amount:parseCurrency(String(r.Monto||'0')),
-        type:String(r.Tipo||'gasto').toLowerCase()==='ingreso'?'ingreso':'gasto'
-      }));
+    if(Array.isArray(data.Finanzas)){
+      const remote=data.Finanzas
+        .filter(r=>r.ID&&(r.Descripción||r.Descripcion)&&!deletedIds.has(String(r.ID)))
+        .map(r=>({
+          id:String(r.ID), date:String(r.Fecha||''),
+          desc:String(r.Descripción||r.Descripcion||''),
+          amount:parseCurrency(String(r.Monto||'0')),
+          type:String(r.Tipo||'gasto').toLowerCase()==='ingreso'?'ingreso':'gasto'
+        }));
+      // Sheets es la fuente de verdad para finanzas — reemplaza completamente,
+      // pero respeta la lista negra de eliminados
+      const localUnsaved=transactions.filter(t=>!t._inSheets&&!deletedIds.has(t.id));
       const remoteIds=new Set(remote.map(t=>t.id));
-      const localOnly=transactions.filter(t=>!remoteIds.has(t.id));
+      const localOnly=localUnsaved.filter(t=>!remoteIds.has(t.id));
       transactions=[...remote,...localOnly];
     }
 
@@ -783,7 +798,7 @@ function toggleStatus(id,field){
         id:'tx_'+o.id, date:o.date,
         desc:`${o.clientName}`, detail:detStr,
         dtfT:o.dtfT, stT:o.stT, vnT:o.vnT, dA:o.dA||0, dp:o.dp||0, sub:o.sub, iva:o.iva,
-        amount:o.total, type:'ingreso', oid:o.id
+        amount:o.total, type:'ingreso', oid:o.id, _inSheets:true
       });
       syncSheets({sheet:'Finanzas',action:'append',row:['tx_'+o.id,o.date,`${o.clientName} (${detStr})`,fmt(o.total),'Ingreso']});
       toast('💵 Pago registrado en Finanzas ✓');
@@ -805,7 +820,8 @@ function toggleStatus(id,field){
 function deleteOrder(id){
   orders=orders.filter(o=>o.id!==id);
   transactions=transactions.filter(t=>t.oid!==id);
-  save(); syncSheets({sheet:'Pedidos',action:'delete',id});
+  markDeleted(id); markDeleted('tx_'+id); save();
+  syncSheets({sheet:'Pedidos',action:'delete',id});
   syncSheets({sheet:'Finanzas',action:'delete',id:'tx_'+id});
   renderOrders(); toast('Pedido eliminado');
 }
@@ -814,6 +830,7 @@ function deleteGroup(date){
   const ids=orders.filter(o=>o.date===date).map(o=>o.id);
   orders=orders.filter(o=>o.date!==date);
   transactions=transactions.filter(t=>!ids.includes(t.oid));
+  ids.forEach(id=>{ markDeleted(id); markDeleted('tx_'+id); });
   save();
   ids.forEach(id=>{ syncSheets({sheet:'Pedidos',action:'delete',id}); syncSheets({sheet:'Finanzas',action:'delete',id:'tx_'+id}); });
   renderOrders(); toast(`${ids.length} pedido${ids.length>1?'s':''} eliminado${ids.length>1?'s':''}`);
@@ -874,7 +891,8 @@ function editClient(id){
   validatePhone(); window.scrollTo({top:0,behavior:'smooth'});
 }
 function deleteClient(id){
-  clients=clients.filter(c=>c.id!==id); save();
+  clients=clients.filter(c=>c.id!==id);
+  markDeleted(id); save();
   syncSheets({sheet:'Clientes',action:'delete',id});
   renderClients(''); renderPicker(''); toast('Cliente eliminado');
 }
@@ -912,6 +930,10 @@ function resetFinanzas(){
     // Reset only selected month
     const [yr,mon]=mfVal.split('-');
     const before=transactions.length;
+    transactions.forEach(t=>{
+      const p=t.date.split('/');
+      if(p.length===3&&p[1].padStart(2,'0')===mon&&p[2]===yr) markDeleted(t.id);
+    });
     transactions=transactions.filter(t=>{
       const p=t.date.split('/');
       if(p.length===3) return !(p[1].padStart(2,'0')===mon&&p[2]===yr);
@@ -928,6 +950,7 @@ function resetFinanzas(){
     toast(`Finanzas de ${mon}/${yr} reiniciadas ✓`);
   } else {
     if(!confirm('⚠️ ¿Reiniciar TODOS los movimientos de finanzas?\n\nEsto eliminará todos los registros. Los pedidos seguirán existiendo pero se desmarcarán como pagados.\n\nEsta acción no se puede deshacer.')) return;
+    transactions.forEach(t=>markDeleted(t.id));
     transactions=[];
     orders.forEach(o=>o.paid=false);
     save(); renderFin(); renderOrders();
@@ -957,14 +980,15 @@ function renderFR(){
 function saveFinRows(){
   const valid=finRows.filter(r=>r.desc.trim()&&parseFloat(r.amount)>0);
   if(!valid.length){toast('Agrega al menos un movimiento válido','err');return}
-  const newTx=valid.map(r=>({id:uid(),date:new Date(r.date+'T12:00:00').toLocaleDateString('es-MX'),desc:r.desc.trim(),amount:parseFloat(r.amount),type:r.type}));
+  const newTx=valid.map(r=>({id:uid(),date:new Date(r.date+'T12:00:00').toLocaleDateString('es-MX'),desc:r.desc.trim(),amount:parseFloat(r.amount),type:r.type,_inSheets:true}));
   transactions=[...newTx,...transactions]; save();
   newTx.forEach(t=>syncSheets({sheet:'Finanzas',action:'append',row:[t.id,t.date,t.desc,fmt(t.amount),t.type==='ingreso'?'Ingreso':'Gasto']}));
   toast(`${newTx.length} movimiento${newTx.length>1?'s':''} guardado${newTx.length>1?'s':''} ✓`);
   finRows=[emptyFR()]; renderFR(); renderFin();
 }
 function deleteTx(id){
-  transactions=transactions.filter(t=>t.id!==id); save();
+  transactions=transactions.filter(t=>t.id!==id);
+  markDeleted(id); save();
   syncSheets({sheet:'Finanzas',action:'delete',id});
   renderFin(); toast('Movimiento eliminado');
 }
@@ -995,8 +1019,10 @@ function renderFin(){
   const cc=$('chart-card');
   if(cd.length>0){
     cc.style.display='block';
-    if(finChart)finChart.destroy();
-    finChart=new Chart($('finChart'),{type:'bar',data:{labels:cd.map(([k])=>k),datasets:[
+    if(finChart){finChart.destroy();finChart=null;}
+    const chartCanvas=$('finChart');
+    if(!chartCanvas)return;
+    finChart=new Chart(chartCanvas,{type:'bar',data:{labels:cd.map(([k])=>k),datasets:[
       {label:'Ingresos',data:cd.map(([,d])=>d.i),backgroundColor:'rgba(52,211,153,.7)',borderRadius:6},
       {label:'Gastos',data:cd.map(([,d])=>d.g),backgroundColor:'rgba(248,113,113,.7)',borderRadius:6}
     ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmt(ctx.raw)},backgroundColor:'#1a1040',borderColor:'rgba(160,132,238,.3)',borderWidth:1,titleColor:'#e8e0ff',bodyColor:'#e8e0ff'}},
@@ -1039,11 +1065,12 @@ function renderFin(){
 
 // ═══════════════ INIT ═══════════════
 initFR(); calcQ(); validatePhone(); updateBadge(); renderClients('');
-// Auto-sync from Sheets on load (silently, without blocking UI)
+renderOrders();
+// Auto-sync from Sheets on load (silent, non-blocking)
 if(sheetsUrl){
   setTimeout(()=>{
     syncFromSheets().catch(e=>console.warn('Auto-sync on load failed:',e));
-  }, 800);
+  }, 900);
 }
 </script>
 </body>
