@@ -1464,7 +1464,7 @@ async function doLogin(){
 
   setLoginLoading(true); setLoginError('');
 
-  // Intentar cargar usuarios desde Sheets si hay URL configurada
+  // Cargar usuarios desde Sheets si hay URL configurada
   if(sheetsUrl){
     try{
       const res = await fetch(sheetsUrl+'?t='+Date.now(),{method:'GET',redirect:'follow'});
@@ -1477,9 +1477,15 @@ async function doLogin(){
     } catch(e){ console.warn('No se pudo cargar usuarios desde Sheets:', e); }
   }
 
-  // Validar contra usuarios remotos primero, luego fallback
-  const pool = remoteUsers.length > 0 ? remoteUsers : FALLBACK_USERS;
-  const found = pool.find(u => u.user===user && u.pass===pass);
+  // Pool = usuarios de Sheets + fallback fusionados
+  // Si un usuario existe en ambos, Sheets tiene prioridad (permite cambiar contraseña del admin también)
+  const sheetIds = new Set(remoteUsers.map(u=>u.user));
+  const pool = [
+    ...remoteUsers,
+    ...FALLBACK_USERS.filter(u => !sheetIds.has(u.user))
+  ];
+
+  const found = pool.find(u => u.user === user && u.pass === pass);
 
   setLoginLoading(false);
 
