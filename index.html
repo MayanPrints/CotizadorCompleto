@@ -521,6 +521,17 @@ function doGet(e) {
     result['Eliminados'] = [];
   }
 
+  // Hoja Papelera — items borrados completos (JSON), para sincronizar entre dispositivos
+  var trashSheet = ss.getSheetByName('Papelera');
+  if (trashSheet && trashSheet.getLastRow() > 1) {
+    var trashVals = trashSheet.getDataRange().getValues();
+    result['Papelera'] = trashVals.slice(1).map(function(r) {
+      try { return JSON.parse(String(r[1])); } catch(e) { return null; }
+    }).filter(Boolean);
+  } else {
+    result['Papelera'] = [];
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
@@ -555,6 +566,42 @@ function doPost(e) {
     return ContentService
       .createTextOutput(JSON.stringify({ok:true}))
       .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Guardar item en papelera de Sheets
+  if (data.action === 'saveTrashedItem') {
+    var trashSheet = ss.getSheetByName('Papelera') || ss.insertSheet('Papelera');
+    if (trashSheet.getLastRow() === 0) trashSheet.appendRow(['ID','Datos_JSON','Fecha']);
+    // Evitar duplicados
+    var existingIds = trashSheet.getLastRow() > 1
+      ? trashSheet.getDataRange().getValues().slice(1).map(function(r){ return String(r[0]); })
+      : [];
+    if (existingIds.indexOf(String(data.id)) === -1) {
+      trashSheet.appendRow([String(data.id), JSON.stringify(data.item), new Date().toLocaleDateString('es-MX')]);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Eliminar item de papelera de Sheets (al restaurar o vaciar)
+  if (data.action === 'removeFromTrash') {
+    var trashSheet = ss.getSheetByName('Papelera');
+    if (trashSheet && trashSheet.getLastRow() > 1) {
+      var vals = trashSheet.getDataRange().getValues();
+      for (var i = 1; i < vals.length; i++) {
+        if (String(vals[i][0]) === String(data.id)) { trashSheet.deleteRow(i+1); break; }
+      }
+    }
+    // También quitar de Eliminados (si se está restaurando)
+    if (data.restore) {
+      var delSheet = ss.getSheetByName('Eliminados');
+      if (delSheet && delSheet.getLastRow() > 1) {
+        var dvals = delSheet.getDataRange().getValues();
+        for (var i = dvals.length-1; i >= 1; i--) {
+          if (String(dvals[i][0]) === String(data.id)) { delSheet.deleteRow(i+1); break; }
+        }
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
   }
 
   // Acciones normales: append / update / delete
@@ -650,8 +697,12 @@ function confirmOk(){
 
 // ── PAPELERA ─────────────────────────────────────
 function addToTrash(item){
-  // Evitar duplicados en papelera
-  if(!trash.find(t=>t._trashId===item._trashId)) trash.unshift(item);
+  // Evitar duplicados en papelera local
+  if(!trash.find(t=>t._trashId===item._trashId)){
+    trash.unshift(item);
+    // Sincronizar item a hoja Papelera en Sheets
+    syncSheets({action:'saveTrashedItem', id:item._trashId, item});
+  }
   updateTrashBadge();
 }
 function updateTrashBadge(){
@@ -701,8 +752,8 @@ function restoreItem(trashId){
     clients.unshift(client);
     syncSheets({sheet:'Clientes',action:'append',row:[client.id,client.name,client.phone,client.email,client.notes,client.since]});
   }
-  // También eliminar de hoja Eliminados en Sheets
-  syncSheets({action:'restoreDeleted', id:trashId});
+  // Quitar de Papelera y de Eliminados en Sheets
+  syncSheets({action:'removeFromTrash', id:trashId, restore:true});
   trash=trash.filter(t=>t._trashId!==trashId);
   save();
   updateTrashBadge(); renderTrash();
@@ -712,6 +763,8 @@ function restoreItem(trashId){
 function emptyTrash(){
   if(!trash.length){toast('La papelera ya está vacía');return;}
   confirmAction('🗑️',`¿Vaciar la papelera? Se eliminarán <span class="confirm-name">${trash.length} elemento${trash.length>1?'s':''}</span> permanentemente.`,()=>{
+    // Eliminar cada item de la hoja Papelera en Sheets
+    trash.forEach(item=>syncSheets({action:'removeFromTrash', id:item._trashId, restore:false}));
     trash=[];
     save(); updateTrashBadge(); renderTrash();
     toast('Papelera vaciada');
@@ -798,9 +851,22 @@ async function syncFromSheets(){
       transactions=[...remote,...localPending];
     }
 
+    // ── PAPELERA — leer items borrados desde Sheets y fusionar ──
+    if(Array.isArray(data.Papelera)){
+      data.Papelera.forEach(item=>{
+        if(item&&item._trashId&&!trash.find(t=>t._trashId===item._trashId)){
+          trash.unshift(item);
+        }
+      });
+      // Quitar de la papelera local items que ya no están en Sheets (restaurados desde otro dispositivo)
+      const remoteTIds=new Set(data.Papelera.map(x=>x&&x._trashId).filter(Boolean));
+      trash=trash.filter(t=>remoteTIds.has(t._trashId)||!t._trashId);
+    }
+
     save();
     renderClients(''); renderPicker('');
     renderOrders(); renderFin();
+    updateTrashBadge(); renderTrash();
     toast('✅ Sincronizado correctamente');
   } catch(e){
     console.error('syncFromSheets:',e);
