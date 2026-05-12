@@ -241,7 +241,7 @@ input:checked+.slider::before{transform:translateX(20px)}
     <button class="tab on" data-tab="cotizar" onclick="switchTab('cotizar')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>Cotizar</button>
     <button class="tab" data-tab="pedidos" onclick="switchTab('pedidos')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Pedidos</button>
     <button class="tab" data-tab="clientes" onclick="switchTab('clientes')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>Clientes</button>
-    <button class="tab" data-tab="finanzas" onclick="switchTab('finanzas')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Finanzas</button>
+    <button class="tab" id="tab-btn-finanzas" data-tab="finanzas" onclick="switchTab('finanzas')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>Finanzas</button>
     <button class="tab" data-tab="papelera" onclick="switchTab('papelera')" id="tab-btn-papelera"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>Papelera<span class="trash-badge" id="trash-badge" style="display:none">0</span></button>
   </div>
 </div></div>
@@ -972,6 +972,10 @@ const fv=id=>parseFloat($(id)?.value||0)||0;
 function toast(msg,type='ok'){ const t=$('toast');t.textContent=msg;t.className='toast on '+type;setTimeout(()=>t.className='toast',3200); }
 function closeModal(id){ $(id).classList.remove('on'); }
 function switchTab(t){
+  // Finanzas solo para admin
+  if(t==='finanzas' && currentUser?.role !== 'admin'){
+    toast('Solo el administrador puede ver Finanzas','err'); return;
+  }
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
   $('tab-'+t).classList.add('on');
@@ -1497,6 +1501,14 @@ function showApp(){
   const nb = document.getElementById('user-name-badge');
   if(av) av.textContent = currentUser.name.charAt(0).toUpperCase();
   if(nb) nb.textContent = currentUser.name;
+  // Mostrar/ocultar tab Finanzas según rol
+  const finTab = document.getElementById('tab-btn-finanzas');
+  if(finTab) finTab.style.display = currentUser.role==='admin' ? '' : 'none';
+  // Si era admin y ahora no, cambiar a Cotizar por si acaso
+  if(currentUser.role !== 'admin'){
+    const activePanel = document.querySelector('.panel.on');
+    if(activePanel && activePanel.id==='tab-finanzas') switchTab('cotizar');
+  }
 }
 
 function doLogout(){
