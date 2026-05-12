@@ -846,7 +846,8 @@ function switchTab(t){
   document.querySelector(`[data-tab="${t}"]`).classList.add('on');
   if(t==='finanzas')renderFin();
   if(t==='pedidos')renderOrders();
-  if(t==='clientes'){ renderClients(''); }
+  if(t==='clientes')renderClients('');
+  if(t==='papelera'){ renderTrash(); updateTrashBadge(); }
 }
 function toggleSvc(s,on){ $('svc-'+s).style.display=on?'block':'none'; }
 
