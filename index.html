@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>DTF Studio</title>
+<title>Mayan Prints</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
@@ -23,10 +23,12 @@ body{background:linear-gradient(135deg,var(--bg) 0%,var(--bg2) 50%,var(--bg) 100
 .brand-icon{width:42px;height:42px;background:linear-gradient(135deg,var(--p2),var(--purple));border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .brand-name{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;line-height:1}
 .brand-sub{font-size:11px;color:var(--muted2);margin-top:2px}
-.tabs{display:flex;gap:6px;background:rgba(255,255,255,.04);border-radius:14px;padding:5px}
-.tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;border:none;border-radius:10px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;background:transparent;color:rgba(200,180,255,.55);transition:all .2s}
+.tabs{display:flex;gap:4px;background:rgba(255,255,255,.04);border-radius:14px;padding:5px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 12px;border:none;border-radius:10px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;background:transparent;color:rgba(200,180,255,.55);transition:all .2s;white-space:nowrap}
 .tab.on{background:linear-gradient(135deg,var(--p2),var(--purple));color:#fff}
 .tab:hover:not(.on){background:rgba(255,255,255,.06)}
+@media(max-width:480px){.tab{font-size:0;padding:10px 13px;gap:0}.tab svg{width:17px;height:17px}.tab.on{font-size:0}.trash-badge{font-size:9px;width:16px;height:16px}}
 .panel{display:none;flex-direction:column;gap:16px;margin-top:20px}.panel.on{display:flex}
 .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px;backdrop-filter:blur(16px)}
 .card-dim{background:rgba(255,255,255,.03)}
@@ -169,19 +171,24 @@ input:checked+.slider::before{transform:translateX(20px)}
   .g2,.g3,.g4{grid-template-columns:1fr}.g-stats{grid-template-columns:1fr}
   .fin-head,.fin-row{grid-template-columns:1fr 80px 28px}.fh{display:none}
 }
+/* EDIT ORDER OVERLAY */
+.edit-overlay{position:fixed;inset:0;background:rgba(10,8,30,.92);backdrop-filter:blur(8px);z-index:600;display:none;flex-direction:column;overflow-y:auto}
+.edit-overlay.on{display:flex}
+.edit-header{display:flex;align-items:center;gap:14px;padding:20px 20px 0;max-width:600px;width:100%;margin:0 auto}
+.edit-body{flex:1;padding:20px;max-width:600px;width:100%;margin:0 auto}
+.edit-section{background:rgba(255,255,255,.04);border:1px solid rgba(150,120,255,.15);border-radius:14px;padding:18px;margin-bottom:14px}
+.edit-section-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+.edit-total-preview{background:linear-gradient(135deg,rgba(124,92,191,.2),rgba(160,132,238,.1));border:1px solid rgba(160,132,238,.3);border-radius:12px;padding:16px;text-align:center;margin-bottom:14px}
+.edit-total-num{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:var(--purple)}
 </style>
 </head>
 <body>
 <div class="header"><div class="max-w">
   <div class="brand">
-    <div class="brand-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.57a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.57a2 2 0 00-1.34-2.23z"/></svg></div>
-    <div><div class="brand-name">DTF Studio</div><div class="brand-sub">Sistema de Cotización Profesional</div></div>
+    <div><div class="brand-name" style="font-size:26px">Mayan Prints</div></div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
-      <div class="sheets-badge" id="sbadge">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>Sheets
-      </div>
       <button class="btn btn-ghost" id="sync-btn" onclick="syncFromSheets()" title="Sincronizar desde Sheets" style="font-size:14px;padding:6px 10px;display:none">🔄</button>
-      <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="openSheets()">⚙️</button>
+      <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="openSheets()" title="Configurar Google Sheets">⚙️ Sheets</button>
     </div>
   </div>
   <div class="tabs">
@@ -385,6 +392,76 @@ input:checked+.slider::before{transform:translateX(20px)}
 
 <div class="toast" id="toast"></div>
 
+<!-- EDIT ORDER OVERLAY -->
+<div class="edit-overlay" id="edit-overlay">
+  <div class="edit-header">
+    <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="closeEditOrder()">← Volver</button>
+    <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800">Editar Pedido</div>
+  </div>
+  <div class="edit-body">
+    <!-- Total preview -->
+    <div class="edit-total-preview">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Total calculado</div>
+      <div class="edit-total-num" id="edit-total-num">$0.00</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px" id="edit-total-detail"></div>
+    </div>
+    <!-- Cliente -->
+    <div class="edit-section">
+      <div class="edit-section-title">👤 Cliente</div>
+      <div class="g2" style="gap:10px">
+        <div><label>Nombre</label><input class="inp" id="e-clientName" placeholder="Nombre del cliente"/></div>
+        <div><label>Teléfono</label><input class="inp" id="e-clientPhone" placeholder="10 dígitos"/></div>
+      </div>
+    </div>
+    <!-- Servicios -->
+    <div class="edit-section">
+      <div class="edit-section-title">🖨️ DTF</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <input type="checkbox" id="e-tog-dtf" onchange="calcEditTotal()" style="width:18px;height:18px;accent-color:var(--purple);cursor:pointer"/>
+        <label style="margin:0;text-transform:none;font-size:14px;cursor:pointer" for="e-tog-dtf">Incluir DTF</label>
+      </div>
+      <div id="e-dtf-fields">
+        <label>Metros</label><input class="inp" id="e-metros" type="number" min="0" step="0.1" placeholder="0" oninput="calcEditTotal()"/>
+      </div>
+    </div>
+    <div class="edit-section">
+      <div class="edit-section-title">👕 Estampado</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <input type="checkbox" id="e-tog-stamp" onchange="calcEditTotal()" style="width:18px;height:18px;accent-color:var(--purple);cursor:pointer"/>
+        <label style="margin:0;text-transform:none;font-size:14px;cursor:pointer" for="e-tog-stamp">Incluir Estampado</label>
+      </div>
+      <div class="g2" style="gap:10px" id="e-stamp-fields">
+        <div><label>Prendas</label><input class="inp" id="e-shirts" type="number" min="0" placeholder="0" oninput="calcEditTotal()"/></div>
+        <div><label>Costo/prenda</label><input class="inp" id="e-sc" type="number" min="0" step="0.5" placeholder="0" oninput="calcEditTotal()"/></div>
+        <div><label>Estampado/prenda</label><input class="inp" id="e-se" type="number" min="0" step="0.5" placeholder="0" oninput="calcEditTotal()"/></div>
+      </div>
+    </div>
+    <div class="edit-section">
+      <div class="edit-section-title">🎨 Vinil</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <input type="checkbox" id="e-tog-vinyl" onchange="calcEditTotal()" style="width:18px;height:18px;accent-color:var(--purple);cursor:pointer"/>
+        <label style="margin:0;text-transform:none;font-size:14px;cursor:pointer" for="e-tog-vinyl">Incluir Vinil</label>
+      </div>
+      <div class="g2" style="gap:10px" id="e-vinyl-fields">
+        <div><label>Alto (ml)</label><input class="inp" id="e-vh" type="number" min="0" step="0.1" placeholder="0" oninput="calcEditTotal()"/></div>
+        <div><label>Cantidad</label><input class="inp" id="e-vq" type="number" min="1" placeholder="1" oninput="calcEditTotal()"/></div>
+        <div><label>Precio/ml</label><input class="inp" id="e-vp" type="number" min="0" step="0.5" placeholder="0" oninput="calcEditTotal()"/></div>
+        <div><label>Base (m)</label><input class="inp" id="e-vb" type="number" min="0" step="0.01" placeholder="0" oninput="calcEditTotal()"/></div>
+      </div>
+    </div>
+    <!-- Descuento y notas -->
+    <div class="edit-section">
+      <div class="edit-section-title">💬 Descuento y notas</div>
+      <div class="g2" style="gap:10px">
+        <div><label>Descuento %</label><input class="inp" id="e-disc" type="number" min="0" max="100" placeholder="0" oninput="calcEditTotal()"/></div>
+        <div><label>Notas</label><input class="inp" id="e-notes" placeholder="Observaciones"/></div>
+      </div>
+    </div>
+    <button class="btn btn-pri full" onclick="saveEditOrder()">💾 Guardar cambios</button>
+    <div style="height:30px"></div>
+  </div>
+</div>
+
 <!-- CONFIRM MODAL -->
 <div class="modal-bg" id="confirm-modal">
   <div class="confirm-modal">
@@ -522,21 +599,7 @@ function doPost(e) {
   </div>
 </div>
 
-<!-- EDIT ORDER MODAL -->
-<div class="modal-bg" id="edit-modal">
-  <div class="modal">
-    <div class="modal-title">✏️ Editar Pedido</div>
-    <input type="hidden" id="eo-id"/>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div><label>Notas</label><input class="inp" id="eo-notes" placeholder="Detalles..."/></div>
-      <div><label>Descuento (%)</label><input class="inp" type="number" id="eo-disc" min="0" max="100" placeholder="0" oninput="if(this.value<0)this.value=0;if(this.value>100)this.value=100"/></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-pri" style="flex:1;justify-content:center" onclick="saveEditOrder()">Guardar</button>
-      <button class="btn btn-ghost" onclick="closeModal('edit-modal')">Cancelar</button>
-    </div>
-  </div>
-</div>
+
 
 <script>
 // ═══════════════ STATE ═══════════════
@@ -761,7 +824,6 @@ function saveSheets(){
   else toast('URL eliminada');
 }
 function updateBadge(){
-  document.getElementById('sbadge').className='sheets-badge'+(sheetsUrl?' on':'');
   const sb=$('sync-btn');
   if(sb) sb.style.display=sheetsUrl?'inline-flex':'none';
 }
@@ -1015,15 +1077,6 @@ function deleteGroup(date){
   });
 }
 
-function openEditOrder(id){ const o=orders.find(x=>x.id===id);if(!o)return; $('eo-id').value=id;$('eo-notes').value=o.notes||'';$('eo-disc').value=o.dp||0; $('edit-modal').classList.add('on'); }
-function saveEditOrder(){
-  const id=$('eo-id').value, o=orders.find(x=>x.id===id); if(!o)return;
-  o.notes=$('eo-notes').value;
-  const dp=parseFloat($('eo-disc').value)||0;
-  const sub=o.preDisc*(1-dp/100), iva=sub*IVA;
-  o.dp=dp;o.dA=o.preDisc*(dp/100);o.sub=sub;o.iva=iva;o.total=sub+iva;
-  save(); closeModal('edit-modal'); renderOrders(); toast('Pedido actualizado ✓');
-}
 
 // ═══════════════ CLIENTS ═══════════════
 function validatePhone(){
@@ -1249,9 +1302,99 @@ function renderFin(){
   }).join('');
 }
 
+// ═══════════════ EDIT ORDER ═══════════════
+let _editOrderId = null;
+
+function openEditOrder(id){
+  const o=orders.find(x=>x.id===id); if(!o)return;
+  _editOrderId=id;
+  // Llenar campos
+  $('e-clientName').value = o.clientName||'';
+  $('e-clientPhone').value = o.clientPhone||'';
+  $('e-tog-dtf').checked  = !!o.dtfOn;
+  $('e-metros').value     = o.metros||0;
+  $('e-tog-stamp').checked= !!o.stOn;
+  $('e-shirts').value     = o.shirts||0;
+  $('e-sc').value         = o.sc||0;
+  $('e-se').value         = o.se||0;
+  $('e-tog-vinyl').checked= !!o.vnOn;
+  $('e-vh').value         = o.vH||0;
+  $('e-vq').value         = o.vQ||1;
+  $('e-vp').value         = o.vp||0;
+  $('e-vb').value         = o.vb||0;
+  $('e-disc').value       = o.dp||0;
+  $('e-notes').value      = o.notes||'';
+  calcEditTotal();
+  $('edit-overlay').classList.add('on');
+  window.scrollTo(0,0);
+}
+
+function closeEditOrder(){
+  $('edit-overlay').classList.remove('on');
+  _editOrderId=null;
+}
+
+function calcEditTotal(){
+  const dtfOn=$('e-tog-dtf').checked;
+  const stOn =$('e-tog-stamp').checked;
+  const vnOn =$('e-tog-vinyl').checked;
+  const efv=id=>parseFloat($(id)?.value)||0;
+  const dtfT = dtfOn ? efv('e-metros')*DTF : 0;
+  const stT  = stOn  ? efv('e-shirts')*(efv('e-sc')+efv('e-se')) : 0;
+  const vnT  = vnOn  ? efv('e-vh')*(efv('e-vq')||1)*efv('e-vp') : 0;
+  const preDisc=dtfT+stT+vnT;
+  const dp=efv('e-disc'), dA=preDisc*(dp/100);
+  const sub=preDisc-dA, iva=sub*IVA, total=sub+iva;
+  $('edit-total-num').textContent=fmt(total);
+  const parts=[];
+  if(dtfOn&&dtfT>0) parts.push(`DTF ${fmt(dtfT)}`);
+  if(stOn&&stT>0)   parts.push(`Estampado ${fmt(stT)}`);
+  if(vnOn&&vnT>0)   parts.push(`Vinil ${fmt(vnT)}`);
+  if(dA>0)          parts.push(`Desc. -${fmt(dA)}`);
+  parts.push(`IVA ${fmt(iva)}`);
+  $('edit-total-detail').textContent=parts.join(' · ');
+  return{dtfOn,stOn,vnOn,dtfT,stT,vnT,preDisc,dp,dA,sub,iva,total,
+    metros:efv('e-metros'),shirts:efv('e-shirts'),sc:efv('e-sc'),se:efv('e-se'),
+    vp:efv('e-vp'),vb:efv('e-vb'),vH:efv('e-vh'),vQ:efv('e-vq')||1};
+}
+
+function saveEditOrder(){
+  if(!_editOrderId)return;
+  const o=orders.find(x=>x.id===_editOrderId); if(!o)return;
+  const d=calcEditTotal();
+  if(!d.dtfOn&&!d.stOn&&!d.vnOn){toast('Activa al menos un servicio','err');return;}
+  if(d.total<=0){toast('El total debe ser mayor a $0','err');return;}
+  // Actualizar pedido
+  Object.assign(o,{
+    clientName:$('e-clientName').value.trim()||o.clientName,
+    clientPhone:$('e-clientPhone').value.trim(),
+    dtfOn:d.dtfOn, stOn:d.stOn, vnOn:d.vnOn,
+    dtfT:d.dtfT, stT:d.stT, vnT:d.vnT,
+    metros:d.metros, shirts:d.shirts, sc:d.sc, se:d.se,
+    vp:d.vp, vb:d.vb, vH:d.vH, vQ:d.vQ,
+    preDisc:d.preDisc, dp:d.dp, dA:d.dA, sub:d.sub, iva:d.iva, total:d.total,
+    notes:$('e-notes').value.trim()
+  });
+  // Si estaba pagado, actualizar la transacción vinculada
+  if(o.paid){
+    const tx=transactions.find(t=>t.oid===o.id);
+    if(tx){ tx.amount=o.total; tx.desc=o.clientName;
+      syncSheets({sheet:'Finanzas',action:'update',id:tx.id,
+        row:[tx.id,tx.date,o.clientName,fmt(o.total),'Ingreso']}); }
+  }
+  save();
+  const estado=o.done?'entregado':o.prod?'produccion':o.paid?'pagado':'pendiente';
+  syncSheets({sheet:'Pedidos',action:'update',id:o.id,
+    row:[o.id,o.date,o.clientName,o.clientPhone,o.dtfOn?o.metros:0,
+         o.stOn?o.shirts:0,o.vnOn?o.vH:0,fmt(o.total),o.notes,estado]});
+  closeEditOrder();
+  renderOrders();
+  toast('✅ Pedido actualizado ✓');
+}
+
 // ═══════════════ INIT ═══════════════
-initFR(); calcQ(); validatePhone(); updateBadge(); renderClients('');
-renderOrders();
+initFR(); calcQ(); validatePhone(); updateBadge();
+renderClients(''); renderOrders(); updateTrashBadge(); renderTrash();
 // Auto-sync from Sheets on load (silent, non-blocking)
 if(sheetsUrl){
   setTimeout(()=>{
