@@ -8,6 +8,21 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* ═══ LOGIN ═══ */
+#login-screen{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0d0b1e 0%,#12103a 60%,#0d0b1e 100%);display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{width:100%;max-width:380px;text-align:center}
+.login-logo{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;background:linear-gradient(135deg,#a78bfa,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px}
+.login-sub{font-size:13px;color:rgba(200,180,255,.4);margin-bottom:32px}
+.login-card{background:rgba(255,255,255,.04);border:1px solid rgba(150,120,255,.2);border-radius:20px;padding:28px 24px}
+.login-field{margin-bottom:14px;text-align:left}
+.login-field label{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(200,180,255,.5);display:block;margin-bottom:6px}
+.login-inp{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(150,120,255,.2);border-radius:10px;padding:12px 14px;color:#fff;font-family:inherit;font-size:14px;outline:none;box-sizing:border-box;transition:border .2s}
+.login-inp:focus{border-color:rgba(160,132,238,.6)}
+.login-err{font-size:12px;color:#f87171;margin-top:10px;min-height:18px;text-align:center}
+.btn-login{width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#a78bfa);color:#fff;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;transition:opacity .2s}
+.btn-login:hover{opacity:.88}
+.user-badge{display:flex;align-items:center;gap:7px;background:rgba(160,132,238,.12);border:1px solid rgba(160,132,238,.2);border-radius:20px;padding:4px 12px 4px 5px;cursor:pointer;font-size:12px;font-weight:600;color:rgba(200,180,255,.8)}
+.user-av{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a78bfa);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
 :root{
   --bg:#0f0c29;--bg2:#1a1040;--purple:#a084ee;--p2:#7c5cbf;
   --text:#e8e0ff;--muted:rgba(200,180,255,.5);--muted2:rgba(200,180,255,.3);
@@ -183,12 +198,43 @@ input:checked+.slider::before{transform:translateX(20px)}
 </style>
 </head>
 <body>
+<!-- ═══ LOGIN SCREEN ═══ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Mayan Prints</div>
+    <div class="login-sub">Sistema de Cotización Profesional</div>
+    <div class="login-card">
+      <div class="login-field">
+        <label>Usuario</label>
+        <input class="login-inp" id="l-user" placeholder="tu usuario" autocomplete="username" autocapitalize="none"
+          onkeydown="if(event.key==='Enter')document.getElementById('l-pass').focus()"/>
+      </div>
+      <div class="login-field" style="margin-bottom:6px">
+        <label>Contraseña</label>
+        <div style="position:relative">
+          <input class="login-inp" id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password"
+            onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:42px"/>
+          <button onclick="togglePass()" type="button" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(200,180,255,.5);cursor:pointer;font-size:16px;padding:0" id="pass-eye">👁</button>
+        </div>
+      </div>
+      <div class="login-err" id="l-err"></div>
+      <button class="btn-login" onclick="doLogin()">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ APP (visible solo tras login) ═══ -->
+<div id="main-app" style="display:none">
 <div class="header"><div class="max-w">
   <div class="brand">
     <div><div class="brand-name" style="font-size:26px">Mayan Prints</div></div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
       <button class="btn btn-ghost" id="sync-btn" onclick="syncFromSheets()" title="Sincronizar desde Sheets" style="font-size:14px;padding:6px 10px;display:none">🔄</button>
       <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="openSheets()" title="Configurar Google Sheets">⚙️ Sheets</button>
+      <div class="user-badge" onclick="doLogout()" title="Cerrar sesión">
+        <div class="user-av" id="user-av">?</div>
+        <span id="user-name-badge"></span>
+      </div>
     </div>
   </div>
   <div class="tabs">
@@ -480,7 +526,8 @@ input:checked+.slider::before{transform:translateX(20px)}
     <div class="modal-title">⚙️ Conectar Google Sheets</div>
     <p style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6">Pega la URL de tu Google Apps Script Web App. Todos los datos se sincronizarán automáticamente.</p>
     <div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:10px 14px;font-size:12px;color:rgba(52,211,153,.8);margin-bottom:14px">
-      🔄 <strong>Sincronización bidireccional:</strong> la app ahora lee Y escribe en tu hoja. Al abrir la app (o pulsar 🔄) descarga los datos actualizados, así todos tus dispositivos ven siempre lo mismo.
+      🔄 <strong>Sincronización bidireccional:</strong> la app lee Y escribe en tu hoja. Al abrir la app (o pulsar 🔄) descarga los datos actualizados.<br/><br/>
+      👤 <strong>Usuarios:</strong> crea una hoja llamada <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px">Usuarios</code> con columnas <code style="background:rgba(0,0,0,.3);padding:1px 5px;border-radius:4px">Usuario · Contraseña · Nombre · Rol</code> para gestionar accesos sin tocar el código.
     </div>
     <div style="margin-bottom:14px"><label>URL del Web App</label><input class="inp" id="sheets-url" placeholder="https://script.google.com/macros/s/..."/></div>
     <div style="background:rgba(66,133,244,.08);border:1px solid rgba(66,133,244,.2);border-radius:10px;padding:12px;font-size:12px;color:rgba(150,180,255,.7);line-height:1.8;margin-bottom:10px">
@@ -530,6 +577,25 @@ function doGet(e) {
     }).filter(Boolean);
   } else {
     result['Papelera'] = [];
+  }
+
+  // Hoja Usuarios — para login dinámico desde Sheets
+  var usersSheet = ss.getSheetByName('Usuarios');
+  if (usersSheet && usersSheet.getLastRow() > 1) {
+    var uVals = usersSheet.getDataRange().getValues();
+    var uHeaders = uVals[0]; // Usuario, Contraseña, Nombre, Rol
+    result['Usuarios'] = uVals.slice(1)
+      .filter(function(r){ return r[0] && r[1]; })
+      .map(function(r){
+        return {
+          user: String(r[0]).trim().toLowerCase(),
+          pass: String(r[1]).trim(),
+          name: String(r[2]||r[0]).trim(),
+          role: String(r[3]||'staff').trim().toLowerCase()
+        };
+      });
+  } else {
+    result['Usuarios'] = [];
   }
 
   return ContentService
@@ -1369,6 +1435,130 @@ function renderFin(){
   }).join('');
 }
 
+// ═══════════════ LOGIN ═══════════════
+// Usuarios fallback — se usan si Sheets no está configurado o no responde
+const FALLBACK_USERS = [
+  { user: 'admin', pass: 'mayan2024', name: 'Admin', role: 'admin' },
+];
+
+let currentUser = null;
+let remoteUsers = []; // Se carga desde Sheets al hacer login
+
+function setLoginLoading(on){
+  const btn = document.querySelector('.btn-login');
+  if(btn){ btn.textContent = on ? '⏳ Verificando...' : 'Entrar'; btn.disabled = on; }
+}
+
+function setLoginError(msg){
+  document.getElementById('l-err').textContent = msg;
+}
+
+async function doLogin(){
+  const user = document.getElementById('l-user').value.trim().toLowerCase();
+  const pass = document.getElementById('l-pass').value;
+  if(!user||!pass){ setLoginError('Completa usuario y contraseña'); return; }
+
+  setLoginLoading(true); setLoginError('');
+
+  // Intentar cargar usuarios desde Sheets si hay URL configurada
+  if(sheetsUrl){
+    try{
+      const res = await fetch(sheetsUrl+'?t='+Date.now(),{method:'GET',redirect:'follow'});
+      if(res.ok){
+        const data = await res.json();
+        if(Array.isArray(data.Usuarios) && data.Usuarios.length>0){
+          remoteUsers = data.Usuarios;
+        }
+      }
+    } catch(e){ console.warn('No se pudo cargar usuarios desde Sheets:', e); }
+  }
+
+  // Validar contra usuarios remotos primero, luego fallback
+  const pool = remoteUsers.length > 0 ? remoteUsers : FALLBACK_USERS;
+  const found = pool.find(u => u.user===user && u.pass===pass);
+
+  setLoginLoading(false);
+
+  if(!found){
+    setLoginError('Usuario o contraseña incorrectos');
+    document.getElementById('l-pass').value='';
+    document.getElementById('l-pass').focus();
+    return;
+  }
+  currentUser = found;
+  sessionStorage.setItem('mp_user', JSON.stringify(found));
+  showApp();
+}
+
+function showApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('main-app').style.display='';
+  const av = document.getElementById('user-av');
+  const nb = document.getElementById('user-name-badge');
+  if(av) av.textContent = currentUser.name.charAt(0).toUpperCase();
+  if(nb) nb.textContent = currentUser.name;
+}
+
+function doLogout(){
+  if(!confirm('¿Cerrar sesión?')) return;
+  sessionStorage.removeItem('mp_user');
+  currentUser = null;
+  document.getElementById('main-app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('l-user').value='';
+  document.getElementById('l-pass').value='';
+  setLoginError('');
+}
+
+function togglePass(){
+  const inp = document.getElementById('l-pass');
+  const eye = document.getElementById('pass-eye');
+  if(inp.type==='password'){ inp.type='text'; eye.textContent='🙈'; }
+  else { inp.type='password'; eye.textContent='👁'; }
+}
+
+// Restaurar sesión si ya estaba autenticado (recarga de página)
+(function checkSession(){
+  const saved = sessionStorage.getItem('mp_user');
+  if(saved){
+    try{
+      currentUser = JSON.parse(saved);
+      showApp();
+    } catch(e){ sessionStorage.removeItem('mp_user'); }
+  }
+})();
+
+// ═══════════════ NUMERIC INPUT VALIDATION ═══════════════
+// Bloquea letras y símbolos en campos numéricos — permite solo dígitos, punto decimal y retroceso
+function onlyNumbers(e){
+  const allowed=['0','1','2','3','4','5','6','7','8','9','.','Backspace','Delete','ArrowLeft','ArrowRight','Tab','Enter'];
+  if(!allowed.includes(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
+}
+function onlyIntegers(e){
+  const allowed=['0','1','2','3','4','5','6','7','8','9','Backspace','Delete','ArrowLeft','ArrowRight','Tab','Enter'];
+  if(!allowed.includes(e.key) && !e.ctrlKey && !e.metaKey) e.preventDefault();
+}
+// Aplicar a todos los inputs numéricos al cargar
+function applyNumericValidation(){
+  // Enteros (prendas, cantidad)
+  ['q-shirts','q-vq','e-shirts','e-vq'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('keydown',onlyIntegers);
+  });
+  // Decimales estáticos (metros, precios, descuentos)
+  ['q-metros','q-sc','q-se','q-vp','q-vb','q-vh','q-disc',
+   'e-metros','e-sc','e-se','e-vp','e-vb','e-vh','e-vq','e-disc'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('keydown',onlyNumbers);
+  });
+  // Delegación para inputs dinámicos de Finanzas (montos generados en tiempo real)
+  document.addEventListener('keydown', e=>{
+    if(e.target.matches && e.target.matches('#fin-rows input[type="number"]')){
+      onlyNumbers(e);
+    }
+  });
+}
+
 // ═══════════════ EDIT ORDER ═══════════════
 let _editOrderId = null;
 
@@ -1462,6 +1652,7 @@ function saveEditOrder(){
 // ═══════════════ INIT ═══════════════
 initFR(); calcQ(); validatePhone(); updateBadge();
 renderClients(''); renderOrders(); updateTrashBadge(); renderTrash();
+applyNumericValidation();
 // Auto-sync from Sheets on load (silent, non-blocking)
 if(sheetsUrl){
   setTimeout(()=>{
@@ -1469,5 +1660,6 @@ if(sheetsUrl){
   }, 900);
 }
 </script>
+</div><!-- /main-app -->
 </body>
 </html>
