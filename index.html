@@ -1,4 +1,4 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
@@ -230,7 +230,7 @@ input:checked+.slider::before{transform:translateX(20px)}
     <div><div class="brand-name" style="font-size:26px">Mayan Prints</div></div>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
       <button class="btn btn-ghost" id="sync-btn" onclick="syncFromSheets()" title="Sincronizar desde Sheets" style="font-size:14px;padding:6px 10px;display:none">🔄</button>
-      <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="openSheets()" title="Configurar Google Sheets">⚙️ Sheets</button>
+      <button class="btn btn-ghost" id="sheets-cfg-btn" style="font-size:12px;padding:6px 10px" onclick="openSheets()" title="Configurar Google Sheets">⚙️ Sheets</button>
       <div class="user-badge" onclick="doLogout()" title="Cerrar sesión">
         <div class="user-av" id="user-av">?</div>
         <span id="user-name-badge"></span>
@@ -720,7 +720,10 @@ const DTF=135, IVA=0.16;
 let clients     = JSON.parse(localStorage.getItem('dtf_c')||'[]');
 let orders      = JSON.parse(localStorage.getItem('dtf_o')||'[]');
 let transactions= JSON.parse(localStorage.getItem('dtf_t')||'[]');
-let sheetsUrl   = localStorage.getItem('dtf_su')||'';
+// URL de Sheets por defecto — el admin la configura UNA VEZ aquí
+// Así cualquier dispositivo puede autenticarse sin configuración previa
+const DEFAULT_SHEETS_URL = localStorage.getItem('dtf_su')||'';
+let sheetsUrl = DEFAULT_SHEETS_URL;
 // Lista negra: IDs eliminados localmente — no vuelven desde Sheets
 let deletedIds  = new Set(JSON.parse(localStorage.getItem('dtf_del')||'[]'));
 // Papelera: registros borrados que pueden restaurarse
@@ -951,6 +954,9 @@ function openSheets(){ document.getElementById('sheets-url').value=sheetsUrl; do
 function saveSheets(){
   sheetsUrl=document.getElementById('sheets-url').value.trim();
   localStorage.setItem('dtf_su',sheetsUrl);
+  // Guardar también en sessionStorage de sesión actual
+  const saved=sessionStorage.getItem('mp_user');
+  if(saved){ try{ const u=JSON.parse(saved); sessionStorage.setItem('mp_user',JSON.stringify({...u,_su:sheetsUrl})); }catch(e){} }
   updateBadge(); closeModal('sheets-modal');
   if(sheetsUrl){ toast('Google Sheets conectado ✓'); syncFromSheets(); }
   else toast('URL eliminada');
@@ -1478,7 +1484,7 @@ async function doLogin(){
   }
 
   // Pool = usuarios de Sheets + fallback fusionados
-  // Si un usuario existe en ambos, Sheets tiene prioridad (permite cambiar contraseña del admin también)
+  // Si un usuario existe en ambos, Sheets tiene prioridad
   const sheetIds = new Set(remoteUsers.map(u=>u.user));
   const pool = [
     ...remoteUsers,
@@ -1490,13 +1496,19 @@ async function doLogin(){
   setLoginLoading(false);
 
   if(!found){
-    setLoginError('Usuario o contraseña incorrectos');
+    // Si remoteUsers está vacío porque no hay sheetsUrl, dar mensaje más claro
+    if(!sheetsUrl && remoteUsers.length===0){
+      setLoginError('Configura Google Sheets desde ⚙️ para habilitar todos los usuarios');
+    } else {
+      setLoginError('Usuario o contraseña incorrectos');
+    }
     document.getElementById('l-pass').value='';
     document.getElementById('l-pass').focus();
     return;
   }
   currentUser = found;
-  sessionStorage.setItem('mp_user', JSON.stringify(found));
+  // Guardar también la sheetsUrl en la sesión para que persista entre recargas
+  sessionStorage.setItem('mp_user', JSON.stringify({...found, _su: sheetsUrl}));
   showApp();
 }
 
@@ -1507,11 +1519,16 @@ function showApp(){
   const nb = document.getElementById('user-name-badge');
   if(av) av.textContent = currentUser.name.charAt(0).toUpperCase();
   if(nb) nb.textContent = currentUser.name;
-  // Mostrar/ocultar tab Finanzas según rol
+  // Mostrar/ocultar tab Finanzas y botón Sheets config según rol
+  const isAdmin = currentUser.role === 'admin';
   const finTab = document.getElementById('tab-btn-finanzas');
-  if(finTab) finTab.style.display = currentUser.role==='admin' ? '' : 'none';
-  // Si era admin y ahora no, cambiar a Cotizar por si acaso
-  if(currentUser.role !== 'admin'){
+  if(finTab) finTab.style.display = isAdmin ? '' : 'none';
+  const cfgBtn = document.getElementById('sheets-cfg-btn');
+  if(cfgBtn) cfgBtn.style.display = isAdmin ? '' : 'none';
+  const syncBtn = document.getElementById('sync-btn');
+  if(syncBtn && !isAdmin) syncBtn.style.display = 'none';
+  // Si no es admin y está en Finanzas, redirigir a Cotizar
+  if(!isAdmin){
     const activePanel = document.querySelector('.panel.on');
     if(activePanel && activePanel.id==='tab-finanzas') switchTab('cotizar');
   }
@@ -1541,6 +1558,12 @@ function togglePass(){
   if(saved){
     try{
       currentUser = JSON.parse(saved);
+      // Restaurar sheetsUrl si este dispositivo no la tiene en localStorage
+      if(!sheetsUrl && currentUser._su){
+        sheetsUrl = currentUser._su;
+        localStorage.setItem('dtf_su', sheetsUrl);
+        updateBadge();
+      }
       showApp();
     } catch(e){ sessionStorage.removeItem('mp_user'); }
   }
