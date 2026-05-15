@@ -860,12 +860,13 @@ function doPost(e) {
 
 // ═══════════════ KANBAN ═══════════════
 function getKanbanStatus(o) {
-    // Auto-detectar columna si no tiene kanbanStatus explícito
-    if(o.kanbanStatus) return o.kanbanStatus;
+    // Si tiene kanbanStatus explícito y ya fue pagado, usarlo
+    if(o.kanbanStatus && o.kanbanStatus !== 'pendiente') return o.kanbanStatus;
+    // Derivar desde booleanos
     if(o.done) return 'entregado';
     if(o.prod) return 'imprimiendo';
     if(o.paid) return 'pagado';
-    return 'pagado'; // default para pedidos pagados sin estado
+    return 'pendiente'; // sin pagar — no iluminar ningún botón
 }
 
 function setKanbanStatusFromOrder(id, status) {
@@ -935,7 +936,7 @@ function renderKanban() {
     const cols = { pagado:[], imprimiendo:[], listo:[], entregado:[] };
 
     // Solo pedidos pagados van al kanban
-    orders.filter(o => o.paid).forEach(o => {
+    orders.filter(o => o.paid || (o.kanbanStatus && o.kanbanStatus !== 'pendiente')).forEach(o => {
         const st = getKanbanStatus(o);
         if(cols[st]) cols[st].push(o);
         else cols['pagado'].push(o);
@@ -1364,7 +1365,7 @@ function createOrder(){
     dtfT:d.dtfT,stT:d.stT,vnT:d.vnT,
     metros:d.metros,shirts:d.shirts,sc:d.sc,se:d.se,vp:d.vp,vb:d.vb,vH:d.vH,vQ:d.vQ,
     preDisc:d.preDisc,dp:d.dp,dA:d.dA,sub:d.sub,iva:d.iva,total:d.total,
-    notes:$('q-notes').value,paid:false,prod:false,done:false,kanbanStatus:'pagado'
+    notes:$('q-notes').value,paid:false,prod:false,done:false,kanbanStatus:'pendiente'
   };
   orders.unshift(o); save();
   syncSheets({sheet:'Pedidos',action:'append',row:[o.id,o.date,o.clientName,o.clientPhone,o.dtfOn?o.metros:0,o.stOn?o.shirts:0,o.vnOn?o.vH:0,fmt(o.total),o.notes,'pendiente']});
