@@ -105,6 +105,17 @@
     font-size:10px; font-weight:700; color:#aaa;
     text-align:center; margin-bottom:6px;
 }
+/* X en esquina — solo columna Entregado */
+.kb-card-wrap { position:relative; }
+.kb-card-close {
+    position:absolute; top:8px; right:8px;
+    width:22px; height:22px; border-radius:50%;
+    background:#ffe0e0; border:none; cursor:pointer;
+    font-size:13px; font-weight:800; color:#e05555;
+    display:flex; align-items:center; justify-content:center;
+    line-height:1; transition:background .2s;
+}
+.kb-card-close:hover { background:#ffc8c8; }
 
 /* ═══ LOGIN ═══ */
 #login-screen{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0d0b1e 0%,#12103a 60%,#0d0b1e 100%);display:flex;align-items:center;justify-content:center;padding:20px}
@@ -876,18 +887,18 @@ function setKanbanStatus(id, status) {
 function deleteKanbanOrder(id) {
     const o = orders.find(x => x.id === id);
     if(!o) return;
-    confirmAction('📦', `¿Eliminar el pedido entregado de <span class="confirm-name">${o.clientName}</span>? Irá a la papelera.`, () => {
+    confirmAction('📦', `¿Cerrar el pedido de <span class="confirm-name">${o.clientName}</span>? Se eliminará de Cola y Pedidos. Los datos financieros se conservan.`, () => {
+        // Solo mandar el PEDIDO a la papelera — NO la transacción financiera
         addToTrash({...o, _trashId:id, _trashType:'ped', _trashLabel:o.clientName, _trashDate:new Date().toLocaleDateString('es-MX')});
-        const linkedTx = transactions.find(t => t.oid === id);
-        if(linkedTx) addToTrash({...linkedTx, _trashId:'tx_'+id, _trashType:'fin', _trashLabel:linkedTx.desc, _trashDate:new Date().toLocaleDateString('es-MX')});
+        // Eliminar pedido de la lista pero CONSERVAR la transacción financiera
         orders = orders.filter(x => x.id !== id);
-        transactions = transactions.filter(t => t.oid !== id);
+        // NO tocar transactions — los datos de Finanzas quedan intactos
         syncDelete(id, 'Pedidos');
-        syncDelete('tx_'+id, 'Finanzas');
+        // NO llamar syncDelete para Finanzas
         save();
         renderKanban();
         renderOrders();
-        toast('Pedido eliminado — restaurable en Papelera');
+        toast('✅ Pedido cerrado — finanzas conservadas');
     });
 }
 
