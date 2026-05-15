@@ -10,43 +10,100 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 /* ═══ KANBAN ═══ */
-.kanban-board { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; align-items:start; }
-@media(max-width:680px){ .kanban-board{ grid-template-columns:1fr 1fr; } }
-@media(max-width:420px){ .kanban-board{ grid-template-columns:1fr; } }
-.kb-col { background:rgba(255,255,255,.03); border:1px solid rgba(150,120,255,.12); border-radius:16px; padding:12px; min-height:120px; }
+/* Sección Kanban: fondo claro para contraste con tarjetas */
+#tab-kanban {
+    background: #f0f0f5;
+    border-radius: 20px;
+    padding: 16px;
+    margin: -4px;
+}
+#tab-kanban .ttl { color: #1a1040; }
+.kanban-board {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    align-items: start;
+}
+@media(max-width:700px){ .kanban-board{ grid-template-columns:1fr 1fr; gap:6px; } }
+@media(max-width:400px){ .kanban-board{ grid-template-columns:1fr 1fr; gap:5px; } }
+
+.kb-col {
+    background: #e8e8f0;
+    border-radius: 16px;
+    padding: 8px 6px;
+    min-height: 80px;
+}
 .kb-col-hd {
-    font-family:'Syne',sans-serif; font-size:11px; font-weight:800;
-    text-transform:uppercase; letter-spacing:.08em;
-    padding:6px 10px; border-radius:10px; margin-bottom:10px;
-    text-align:center;
+    font-family:'Syne',sans-serif; font-size:10px; font-weight:800;
+    text-transform:uppercase; letter-spacing:.06em;
+    padding:7px 8px; border-radius:12px; margin-bottom:8px;
+    text-align:center; display:flex; align-items:center;
+    justify-content:center; gap:4px;
 }
-.kb-hd-pagado     { background:rgba(52,211,153,.15);  color:#34d399; }
-.kb-hd-imprimiendo{ background:rgba(251,191,36,.15);  color:#fbbf24; }
-.kb-hd-listo      { background:rgba(160,132,238,.15); color:#a084ee; }
-.kb-hd-entregado  { background:rgba(100,100,100,.15); color:#888; }
+.kb-hd-pagado      { background:#d4f5e5; color:#1a9e5c; border:1px solid #a8e6c8; }
+.kb-hd-imprimiendo { background:#fff3cd; color:#b07d00; border:1px solid #fde8a0; }
+.kb-hd-listo       { background:#d6eaff; color:#1a6fc4; border:1px solid #a8d0f5; }
+.kb-hd-entregado   { background:#e0ffe8; color:#1a8a3a; border:1px solid #a0dca8; }
+
+/* Tarjeta estilo screenshot: blanca, sombra suave, nombre negro */
 .kb-card {
-    background:rgba(255,255,255,.05); border:1px solid rgba(150,120,255,.15);
-    border-radius:12px; padding:12px; margin-bottom:8px;
-    transition:border-color .2s; cursor:default;
+    background: #ffffff;
+    border: none;
+    border-radius: 14px;
+    padding: 12px 11px;
+    margin-bottom: 7px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    transition: box-shadow .2s;
 }
-.kb-card:hover { border-color:rgba(160,132,238,.4); }
-.kb-card-name { font-weight:700; font-size:13px; margin-bottom:3px; }
-.kb-card-total { font-family:'Syne',sans-serif; font-size:16px; font-weight:800; color:var(--purple); }
-.kb-card-date  { font-size:10px; color:var(--muted2); margin-top:3px; }
-.kb-card-svcs  { display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
-.kb-empty { font-size:11px; color:rgba(200,180,255,.25); text-align:center; padding:16px 0; }
+.kb-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.13); }
+.kb-card-name {
+    font-weight:700; font-size:13px; margin-bottom:4px;
+    color:#1a1040; line-height:1.3;
+}
+.kb-card-total {
+    font-family:'Syne',sans-serif; font-size:17px; font-weight:800;
+    color:#25c26e; /* verde como en la imagen */
+    margin-bottom:2px;
+}
+.kb-card-date  { font-size:10px; color:#999; }
+.kb-card-svcs  { display:flex; gap:3px; flex-wrap:wrap; margin-top:5px; }
+.kb-empty { font-size:11px; color:#bbb; text-align:center; padding:18px 0; }
+
+/* Botones de avance — compactos */
+.kb-nav-btns { display:flex; gap:4px; margin-top:8px; }
+.kb-btn-next {
+    flex:2; font-size:9px; font-weight:800; font-family:inherit;
+    background:#1a1040; color:#fff; border:none;
+    border-radius:8px; padding:6px 4px; cursor:pointer; text-align:center;
+    transition:opacity .2s;
+}
+.kb-btn-next:hover { opacity:.82; }
+.kb-btn-prev {
+    flex:1; font-size:9px; font-weight:700; font-family:inherit;
+    background:#f0f0f5; color:#999; border:1px solid #ddd;
+    border-radius:8px; padding:6px 4px; cursor:pointer; text-align:center;
+}
+/* Botón borrar — solo en Entregado */
+.kb-btn-del {
+    flex:1; font-size:11px; font-weight:700; font-family:inherit;
+    background:#fff0f0; color:#e05555; border:1px solid #f5c0c0;
+    border-radius:8px; padding:6px 4px; cursor:pointer; text-align:center;
+    transition:background .2s;
+}
+.kb-btn-del:hover { background:#ffe0e0; }
+
 .btn-wa-listo {
-    display:inline-flex; align-items:center; gap:5px; width:100%;
+    display:flex; align-items:center; gap:5px; width:100%;
     justify-content:center; margin-top:8px;
-    background:rgba(37,211,102,.15); border:1px solid rgba(37,211,102,.35);
-    color:#25d366; border-radius:8px; padding:7px 10px;
+    background:#e8faf0; border:1px solid #a0e0b8;
+    color:#1a9e5c; border-radius:10px; padding:8px 10px;
     font-size:11px; font-weight:700; text-decoration:none;
     transition:all .2s; cursor:pointer; font-family:inherit;
 }
-.btn-wa-listo:hover { background:rgba(37,211,102,.28); }
+.btn-wa-listo:hover { background:#d0f5e0; }
 .kb-col-count {
-    font-size:10px; font-weight:700; color:var(--muted2);
-    text-align:center; margin-bottom:8px;
+    font-size:10px; font-weight:700; color:#aaa;
+    text-align:center; margin-bottom:6px;
 }
 
 /* ═══ LOGIN ═══ */
@@ -814,6 +871,24 @@ function setKanbanStatus(id, status) {
     syncSheets({sheet:'Pedidos', action:'update', id:o.id,
         row:[o.id,o.date,o.clientName,o.clientPhone,o.dtfOn?o.metros:0,o.stOn?o.shirts:0,o.vnOn?o.vH:0,fmt(o.total),o.notes,estado]});
     toast({pagado:'💵 Movido a Pagado', imprimiendo:'🖨️ Movido a Imprimiendo', listo:'✅ ¡Listo para entregar!', entregado:'📦 Marcado como Entregado'}[status]||'Actualizado');
+}
+
+function deleteKanbanOrder(id) {
+    const o = orders.find(x => x.id === id);
+    if(!o) return;
+    confirmAction('📦', `¿Eliminar el pedido entregado de <span class="confirm-name">${o.clientName}</span>? Irá a la papelera.`, () => {
+        addToTrash({...o, _trashId:id, _trashType:'ped', _trashLabel:o.clientName, _trashDate:new Date().toLocaleDateString('es-MX')});
+        const linkedTx = transactions.find(t => t.oid === id);
+        if(linkedTx) addToTrash({...linkedTx, _trashId:'tx_'+id, _trashType:'fin', _trashLabel:linkedTx.desc, _trashDate:new Date().toLocaleDateString('es-MX')});
+        orders = orders.filter(x => x.id !== id);
+        transactions = transactions.filter(t => t.oid !== id);
+        syncDelete(id, 'Pedidos');
+        syncDelete('tx_'+id, 'Finanzas');
+        save();
+        renderKanban();
+        renderOrders();
+        toast('Pedido eliminado — restaurable en Papelera');
+    });
 }
 
 function renderKanban() {
