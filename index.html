@@ -385,17 +385,17 @@ input:checked+.slider::before{transform:translateX(20px)}
       <label class="tog-sw"><input type="checkbox" id="tog-dtf" onchange="toggleSvc('dtf',this.checked);calcQ()"/><span class="slider"></span></label>
     </div>
     <div id="svc-dtf" class="svc-box svc-dtf" style="display:none">
-      <div id="dtf-auto-box" class="g2">
+      <div class="g2">
         <div><label>Metros lineales</label><input class="inp" type="number" id="q-metros" min="0" step="0.1" placeholder="0.00 m" oninput="calcQ()"/></div>
         <div style="display:flex;flex-direction:column;justify-content:flex-end">
           <div class="info-box"><span style="color:var(--muted)">Subtotal DTF</span><span style="font-weight:700;color:#c4b5fd" id="sub-dtf">$0.00</span></div>
         </div>
       </div>
-      <div id="dtf-manual-box" class="g2" style="display:none">
-        <div><label>Precio DTF (manual)</label><input class="inp" type="number" id="q-dtf-manual" min="0" step="0.01" placeholder="$0.00" oninput="calcQ()"/></div>
+      <div id="dtf-rate-box" class="g2" style="display:none;margin-top:10px">
+        <div><label>Precio por metro lineal</label><input class="inp" type="number" id="q-dtf-rate" min="0" step="0.01" placeholder="135.00" oninput="calcQ()"/></div>
       </div>
       <div class="tog-row" style="padding:8px 0 0">
-        <div><div class="tog-title" style="font-size:12px">✏️ Precio manual</div><div class="tog-sub">Ingresar el precio del DTF directamente</div></div>
+        <div><div class="tog-title" style="font-size:12px">✏️ Precio por metro manual</div><div class="tog-sub">Por defecto $135/m — activa para cambiarlo</div></div>
         <label class="tog-sw"><input type="checkbox" id="tog-dtf-manual" onchange="toggleDtfManual(this.checked)"/><span class="slider"></span></label>
       </div>
     </div>
@@ -1337,7 +1337,8 @@ function pickClient(id){
 function calcQ(){
   const dtfOn=$('tog-dtf').checked, stOn=$('tog-stamp').checked, vnOn=$('tog-vinyl').checked;
   const dtfManual=$('tog-dtf-manual').checked;
-  const dtfT=dtfOn?(dtfManual?fv('q-dtf-manual'):fv('q-metros')*DTF):0;
+  const dtfRate=dtfManual?(fv('q-dtf-rate')||DTF):DTF;
+  const dtfT=dtfOn?fv('q-metros')*dtfRate:0;
   const shirts=stOn?fv('q-shirts'):0;
   const stT=stOn?shirts*(fv('q-sc')+fv('q-se')):0;
   const vH=vnOn?fv('q-vh'):0, vQ=vnOn?(fv('q-vq')||1):0;
@@ -1356,7 +1357,7 @@ function calcQ(){
   if(vnOn&&vH>0&&fv('q-vp')>0){ const ml=(vH*(fv('q-vq')||1)).toFixed(2),m2=(fv('q-vb')*vH*(fv('q-vq')||1)).toFixed(4); vt.innerHTML=`<span style="font-size:12px;color:rgba(52,211,153,.6)">${ml} ml (${m2} m²)</span><span class="tag" style="background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.3);color:var(--green)">Vinil: ${fmt(vnT)}</span>`; }else vt.innerHTML='';
   // breakdown
   let h='';
-  if(dtfOn&&dtfT>0) h+=dtfManual?`<div class="t-row"><span>🖨️ DTF (manual)</span><span>${fmt(dtfT)}</span></div>`:`<div class="t-row"><span>🖨️ DTF (${fv('q-metros')}m)</span><span>${fmt(dtfT)}</span></div>`;
+  if(dtfOn&&dtfT>0) h+=`<div class="t-row"><span>🖨️ DTF (${fv('q-metros')}m × ${fmt(dtfRate)})</span><span>${fmt(dtfT)}</span></div>`;
   if(stOn&&stT>0)   h+=`<div class="t-row"><span>👕 Estampado (${shirts} pzas)</span><span>${fmt(stT)}</span></div>`;
   if(vnOn&&vnT>0)   h+=`<div class="t-row"><span>🎨 Vinil (${(vH*vQ).toFixed(2)} ml)</span><span>${fmt(vnT)}</span></div>`;
   if(dA>0)          h+=`<div class="t-row"><span>Descuento (${dp}%)</span><span>-${fmt(dA)}</span></div>`;
@@ -1365,12 +1366,12 @@ function calcQ(){
   $('q-breakdown').innerHTML=h;
   $('q-tot-label').textContent=ivaOn?'Total a Cobrar (c/IVA 16%)':'Total a Cobrar (sin IVA)';
   $('q-total').textContent=fmt(total);
-  return{dtfOn,stOn,vnOn,dtfT,stT,vnT,preDisc,dp,dA,sub,iva,total,metros:fv('q-metros'),shirts,sc:fv('q-sc'),se:fv('q-se'),vp:fv('q-vp'),vb:fv('q-vb'),vH,vQ,dtfManual,dtfManualPrice:fv('q-dtf-manual'),ivaOn};
+  return{dtfOn,stOn,vnOn,dtfT,stT,vnT,preDisc,dp,dA,sub,iva,total,metros:fv('q-metros'),shirts,sc:fv('q-sc'),se:fv('q-se'),vp:fv('q-vp'),vb:fv('q-vb'),vH,vQ,dtfManual,dtfRate,ivaOn};
 }
 
 function toggleDtfManual(on){
-  $('dtf-auto-box').style.display = on?'none':'';
-  $('dtf-manual-box').style.display = on?'':'none';
+  $('dtf-rate-box').style.display = on?'':'none';
+  if(on && !$('q-dtf-rate').value) $('q-dtf-rate').value = DTF;
   calcQ();
 }
 
@@ -1385,7 +1386,7 @@ function createOrder(){
     clientId:selClient,clientName:c?c.name:'Sin cliente',clientPhone:c?c.phone:'',
     dtfOn:d.dtfOn,stOn:d.stOn,vnOn:d.vnOn,
     dtfT:d.dtfT,stT:d.stT,vnT:d.vnT,
-    dtfManual:d.dtfManual,dtfManualPrice:d.dtfManualPrice,ivaOn:d.ivaOn,
+    dtfManual:d.dtfManual,dtfRate:d.dtfRate,ivaOn:d.ivaOn,
     metros:d.metros,shirts:d.shirts,sc:d.sc,se:d.se,vp:d.vp,vb:d.vb,vH:d.vH,vQ:d.vQ,
     preDisc:d.preDisc,dp:d.dp,dA:d.dA,sub:d.sub,iva:d.iva,total:d.total,
     notes:$('q-notes').value,paid:false,prod:false,done:false,kanbanStatus:'pendiente'
@@ -1393,7 +1394,7 @@ function createOrder(){
   orders.unshift(o); save();
   syncSheets({sheet:'Pedidos',action:'append',row:[o.id,o.date,o.clientName,o.clientPhone,o.dtfOn?o.metros:0,o.stOn?o.shirts:0,o.vnOn?o.vH:0,fmt(o.total),o.notes,'pendiente']});
   toast('Pedido creado ✓');
-  ['q-metros','q-shirts','q-sc','q-se','q-vp','q-vb','q-vh','q-notes','q-disc','q-dtf-manual'].forEach(id=>{ if($(id))$(id).value=''; });
+  ['q-metros','q-shirts','q-sc','q-se','q-vp','q-vb','q-vh','q-notes','q-disc','q-dtf-rate'].forEach(id=>{ if($(id))$(id).value=''; });
   $('q-vq').value='1';
   ['dtf','stamp','vinyl'].forEach(s=>{ $('tog-'+s).checked=false; toggleSvc(s,false); });
   $('tog-dtf-manual').checked=false; toggleDtfManual(false);
